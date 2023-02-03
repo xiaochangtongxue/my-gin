@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/xiaochangtongxue/my-gin/initialize"
+
 	"github.com/xiaochangtongxue/my-gin/middleware"
 	"github.com/xiaochangtongxue/my-gin/model/result"
 )
@@ -19,8 +19,6 @@ type person struct {
 }
 
 func main() {
-	initialize.InitApiCode()
-
 	r := gin.Default()
 	r.Use(middleware.XssHandler(nil))
 	r.Use(middleware.ErrorHandler())

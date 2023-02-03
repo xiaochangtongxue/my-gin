@@ -1,7 +1,0 @@
-app:
-  env: dev
-  port: 8080
-  appname: gin=-app
-  appurl: http://localhost
-log:
-  address: "./logs"
