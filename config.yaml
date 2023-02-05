@@ -14,3 +14,14 @@ mysql:
 redis:
   host: "127.0.0.1"
   port: 6379
+
+log:
+  level: info # 日志等级
+  root: ./logs  # 日志根目录
+  filename: app.log # 日志文件名称
+  format:   # 可选输出格式为json
+  showline: true  # 显示打印日志方法行数
+  maxbackups: 90  # 保留旧日志最多个数
+  maxsize: 500  # 日志最大大小（MB）
+  maxage: 90  # 日志保留时长
+  compress: true  # 是否压缩

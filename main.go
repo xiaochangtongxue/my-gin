@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"github.com/xiaochangtongxue/my-gin/core"
 	"github.com/xiaochangtongxue/my-gin/global"
@@ -23,6 +23,7 @@ type person struct {
 func main() {
 	gin.SetMode(gin.DebugMode)
 	global.MGIN_VIP = core.Viper()
+	global.MGIN_ZAP = core.Zap()
 	r := gin.Default()
 	r.Use(middleware.XssHandler(nil))
 	r.Use(middleware.ErrorHandler())
@@ -51,11 +52,13 @@ func main() {
 		}
 
 	})
+
 	r.GET("/log", func(ctx *gin.Context) {
-		logrus.WithFields(logrus.Fields{
-			"name": "xiaotang",
-			"age":  22,
-		}).Info("日志")
+
+		for i := 0; i < 1000000; i++ {
+			global.MGIN_ZAP.Info("success", zap.String("test", "test"))
+		}
+
 	})
 	r.Run(":8000")
 }
