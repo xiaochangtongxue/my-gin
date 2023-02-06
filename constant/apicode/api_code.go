@@ -1,6 +1,6 @@
 package apicode
 
-var CodeMsg = make(map[int32]string)
+var codeMsg = make(map[int32]string)
 
 const (
 	OK                     = 200
@@ -25,5 +25,16 @@ const (
 )
 
 func GetMsg(code int32) string {
-	return CodeMsg[code]
+	return codeMsg[code]
+}
+
+func init() {
+	codeMsg[OK] = OKMsg
+	codeMsg[NoContent] = NoContentMsg
+	codeMsg[BadRequest] = BadRequestMsg
+	codeMsg[UnAuthorized] = UnAuthorizedMsg
+	codeMsg[Forbidden] = ForbiddenMsg
+	codeMsg[NoFound] = NoFoundMsg
+	codeMsg[InternalServerError] = InternalServerErrorMsg
+	codeMsg[MyCode] = MyCodeMsg
 }

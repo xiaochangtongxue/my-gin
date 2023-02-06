@@ -7,7 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/xiaochangtongxue/my-gin/initialize"
+
+	"github.com/xiaochangtongxue/my-gin/core"
+	"github.com/xiaochangtongxue/my-gin/global"
 	"github.com/xiaochangtongxue/my-gin/middleware"
 	"github.com/xiaochangtongxue/my-gin/model/result"
 )
@@ -19,8 +21,8 @@ type person struct {
 }
 
 func main() {
-	initialize.InitApiCode()
-
+	gin.SetMode(gin.DebugMode)
+	global.MGIN_VIP = core.Viper()
 	r := gin.Default()
 	r.Use(middleware.XssHandler(nil))
 	r.Use(middleware.ErrorHandler())
@@ -55,6 +57,5 @@ func main() {
 			"age":  22,
 		}).Info("日志信息")
 	})
-
 	r.Run(":8000")
 }
