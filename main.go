@@ -55,7 +55,7 @@ func main() {
 		logrus.WithFields(logrus.Fields{
 			"name": "xiaotang",
 			"age":  22,
-		}).Info("日志信息")
+		}).Info("日志")
 	})
 	r.Run(":8000")
 }
