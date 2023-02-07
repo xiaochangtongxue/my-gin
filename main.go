@@ -55,7 +55,7 @@ func main() {
 
 	r.GET("/log", func(ctx *gin.Context) {
 
-		for i := 0; i < 1000000; i++ {
+		for i := 0; i < 100; i++ {
 			global.MGIN_ZAP.Info("success", zap.String("test", "test"))
 		}
 

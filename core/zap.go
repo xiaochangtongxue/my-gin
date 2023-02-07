@@ -57,6 +57,7 @@ func getLevel() {
 
 func getZapCore() zapcore.Core {
 	var zapEncoder zapcore.Encoder
+	var allZapCore []zapcore.Core
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = func(t time.Time, pae zapcore.PrimitiveArrayEncoder) {
 		pae.AppendString(t.Format("[" + "2006-01-02 15:04:05.000" + "]"))
@@ -67,8 +68,13 @@ func getZapCore() zapcore.Core {
 	} else {
 		zapEncoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
+	file := zapcore.NewCore(zapEncoder, getLogWrite(), level)
+	console := zapcore.NewCore(zapEncoder, os.Stdout, level)
 
-	return zapcore.NewCore(zapEncoder, getLogWrite(), level)
+	allZapCore = append(allZapCore, file)
+	allZapCore = append(allZapCore, console)
+
+	return zapcore.NewTee(allZapCore...)
 }
 
 func getLogWrite() zapcore.WriteSyncer {
