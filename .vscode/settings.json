@@ -19,7 +19,7 @@
     "[go]": {
       "editor.quickSuggestions": {
         "other": "on",
-        "comments": "off",
+        "comments": "on",
         "strings": "on"
       },
       // just for Go

@@ -1,6 +1,6 @@
 package apicode
 
-var codeMsg = make(map[int32]string)
+var codeMsg = make(map[int]string)
 
 const (
 	OK                     = 200
@@ -24,7 +24,7 @@ const (
 	MyCodeMsg = "自定义的错误"
 )
 
-func GetMsg(code int32) string {
+func GetMsg(code int) string {
 	return codeMsg[code]
 }
 

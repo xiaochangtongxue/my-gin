@@ -1,4 +1,4 @@
-package result
+package response
 
 import (
 	"time"
@@ -6,23 +6,23 @@ import (
 	"github.com/xiaochangtongxue/my-gin/constant/apicode"
 )
 
-type apiResult struct {
-	Code    int32
+type apiResponse struct {
+	Code    int
 	Message string
 	Data    interface{}
 	Date    string
 }
 
-func Result(code int32, data interface{}) *apiResult {
+func Result(code int, data interface{}) *apiResponse {
 	return ResultMsg(code, "", data)
 }
 
-func ResultMsg(code int32, message string, data interface{}) *apiResult {
+func ResultMsg(code int, message string, data interface{}) *apiResponse {
 	apiMessage := apicode.GetMsg(code)
 	if len(message) == 0 && len(apiMessage) != 0 {
 		message = apiMessage
 	}
-	return &apiResult{
+	return &apiResponse{
 		Code:    code,
 		Message: message,
 		Data:    data,
@@ -30,18 +30,18 @@ func ResultMsg(code int32, message string, data interface{}) *apiResult {
 	}
 }
 
-func Ok(data interface{}) *apiResult {
+func Ok(data interface{}) *apiResponse {
 	return Result(apicode.OK, data)
 }
 
-func Fail(code int32) *apiResult {
+func Fail(code int) *apiResponse {
 	return Result(code, nil)
 }
 
-func FailMessage(code int32, message string) *apiResult {
+func FailMessage(code int, message string) *apiResponse {
 	return ResultMsg(code, message, nil)
 }
 
-func FailData(code int32, data interface{}) *apiResult {
+func FailData(code int, data interface{}) *apiResponse {
 	return ResultMsg(code, "", data)
 }

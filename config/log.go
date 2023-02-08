@@ -3,11 +3,11 @@ package config
 type Log struct {
 	Level      string `mapstructure:"level" json:"level" yaml:"level"`
 	Root       string `mapstructure:"root" json:"root" yaml:"root"`
-	FileName   string `mapstructure:"filename" json:"filename" yaml:"filename"`
+	FileName   string `mapstructure:"fileName" json:"fileName" yaml:"fileName"`
 	Format     string `mapstructure:"format" json:"format" yaml:"format"`
-	ShowLine   bool   `mapstructure:"showline" json:"showline" yaml:"showline"`
-	MaxBackups int    `mapstructure:"maxbackups" json:"maxbackups" yaml:"maxbackups"`
-	MaxSize    int    `mapstructure:"maxsize" json:"maxsize" yaml:"maxsize"`
-	MaxAge     int    `mapstructure:"maxage" json:"maxage" yaml:"maxage"`
+	ShowLine   bool   `mapstructure:"showLine" json:"showLine" yaml:"showLine"`
+	MaxBackups int    `mapstructure:"maxBackups" json:"maxBackups" yaml:"maxBackups"`
+	MaxSize    int    `mapstructure:"maxSize" json:"maxSize" yaml:"maxSize"`
+	MaxAge     int    `mapstructure:"maxAge" json:"maxAge" yaml:"maxAge"`
 	Compress   bool   `mapstructure:"compress" json:"compress" yaml:"compress"`
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/xiaochangtongxue/my-gin/core"
 	"github.com/xiaochangtongxue/my-gin/global"
 	"github.com/xiaochangtongxue/my-gin/middleware"
-	"github.com/xiaochangtongxue/my-gin/model/result"
+	"github.com/xiaochangtongxue/my-gin/model/response"
 )
 
 type person struct {
@@ -48,7 +48,7 @@ func main() {
 		if err != nil {
 			ctx.Error(err)
 		} else {
-			ctx.JSON(http.StatusOK, result.Ok(p2))
+			ctx.JSON(http.StatusOK, response.Ok(p2))
 		}
 
 	})

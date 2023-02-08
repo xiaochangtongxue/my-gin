@@ -1,7 +1,7 @@
 system:
   env: dev
   port: 8080
-  appname: gin=-app
+  appname: my-gin
   appurl: http://localhost
 
 mysql:
