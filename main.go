@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/xiaochangtongxue/my-gin/response"
 	"net/http"
 	"os"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/xiaochangtongxue/my-gin/core"
 	"github.com/xiaochangtongxue/my-gin/global"
 	"github.com/xiaochangtongxue/my-gin/middleware"
-	"github.com/xiaochangtongxue/my-gin/model/response"
 )
 
 type person struct {
@@ -36,7 +36,7 @@ func main() {
 		name := ctx.Query("name")
 		env := os.Getenv("GO_ENV")
 		fmt.Println(env)
-		ctx.String(http.StatusOK, name)
+		ctx.JSON(http.StatusOK, response.Ok(name))
 
 	})
 

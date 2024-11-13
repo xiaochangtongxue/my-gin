@@ -18,13 +18,13 @@ func Viper() *viper.Viper {
 		switch gin.Mode() {
 		case gin.DebugMode:
 			config = internal.ConfigDefaultFile
-			fmt.Printf("您正在使用gin模式的%s环境名称,config的路径为%s\n", gin.EnvGinMode, internal.ConfigDefaultFile)
+			fmt.Printf("您正在使用gin模式的%s环境名称,config的路径为%s\n", gin.DebugMode, internal.ConfigDefaultFile)
 		case gin.TestMode:
 			config = internal.ConfigDevFile
-			fmt.Printf("您正在使用gin模式的%s环境名称,config的路径为%s\n", gin.EnvGinMode, internal.ConfigDevFile)
+			fmt.Printf("您正在使用gin模式的%s环境名称,config的路径为%s\n", gin.TestMode, internal.ConfigDevFile)
 		case gin.ReleaseMode:
 			config = internal.ConfigReleaseFile
-			fmt.Printf("您正在使用gin模式的%s环境名称,config的路径为%s\n", gin.EnvGinMode, internal.ConfigReleaseFile)
+			fmt.Printf("您正在使用gin模式的%s环境名称,config的路径为%s\n", gin.ReleaseMode, internal.ConfigReleaseFile)
 		}
 	} else {
 		config = configEev

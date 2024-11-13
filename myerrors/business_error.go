@@ -1,6 +1,8 @@
 package myerrors
 
-import "github.com/xiaochangtongxue/my-gin/constant/apicode"
+import (
+	"github.com/xiaochangtongxue/my-gin/response"
+)
 
 type BusinessError struct {
 	ErrorCode int
@@ -13,10 +15,10 @@ func (e *BusinessError) Error() string {
 	return e.Message
 }
 
-func NewBusinessError(code int) *BusinessError {
+func NewBusinessError(apiCode *response.ApiCode) *BusinessError {
 	return &BusinessError{
-		ErrorCode: code,
-		Message:   apicode.GetMsg(code),
+		ErrorCode: apiCode.Code,
+		Message:   apiCode.Message,
 	}
 }
 
