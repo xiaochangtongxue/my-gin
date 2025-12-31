@@ -1,0 +1,48 @@
+# 服务器配置
+server:
+  mode: debug           # 运行模式: debug, release, test
+  host: "0.0.0.0"       # 监听地址
+  port: 8080            # 监听端口
+  read_timeout: 60s     # 读取超时
+  write_timeout: 60s    # 写入超时
+
+# 数据库配置
+database:
+  driver: mysql
+  host: "192.168.111.128"
+  port: 3306
+  username: "root"
+  password: "123456"
+  database: "my_app_db"
+  charset: "utf8mb4"
+  parse_time: true
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 10m
+  slow_threshold: 200ms
+
+# Redis配置
+redis:
+  host: "192.168.111.128"
+  port: 6379
+  password: "123456"
+  db: 0
+  pool_size: 100
+  min_idle_conn: 10
+
+# 日志配置
+logger:
+  level: debug          # 日志级别: debug, info, warn, error, fatal
+  file_name: "logs/app.log"
+  max_size: 500         # 单文件最大尺寸(MB)
+  max_backups: 30       # 保留旧文件最大数量
+  max_age: 90           # 保留旧文件最大天数
+  compress: true        # 是否压缩
+  console: true         # 是否输出到控制台
+
+# JWT配置
+jwt:
+  secret: "your-secret-key-change-in-production"  # 密钥，生产环境请修改
+  expire_time: 24h     # 过期时间
+  issuer: "my-gin"     # 签发者
