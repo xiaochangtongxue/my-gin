@@ -11,11 +11,15 @@ import (
 )
 
 var (
-	db *gorm.DB
+	db         *gorm.DB
+	dbConfig   *config.DatabaseConfig // 存储配置供后续使用
 )
 
 // Init 初始化数据库连接
 func Init(cfg *config.DatabaseConfig) error {
+	// 存储配置供后续使用
+	dbConfig = cfg
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%t&loc=Local",
 		cfg.Username,
 		cfg.Password,

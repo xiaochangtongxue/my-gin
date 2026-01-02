@@ -8,7 +8,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 
 	"github.com/xiaochangtongxue/my-gin/db/migrations"
-	"github.com/xiaochangtongxue/my-gin/pkg/config"
 )
 
 // NewMigrate 创建迁移实例
@@ -122,19 +121,21 @@ func Force(version int) error {
 
 // getDSN 获取数据库连接字符串
 func getDSN() string {
-	cfg := config.Get().Database
-	charset := cfg.Charset
+	if dbConfig == nil {
+		panic("数据库未初始化，无法获取配置")
+	}
+	charset := dbConfig.Charset
 	if charset == "" {
 		charset = "utf8mb4"
 	}
 
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%t&loc=Local",
-		cfg.Username,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.Database,
+		dbConfig.Username,
+		dbConfig.Password,
+		dbConfig.Host,
+		dbConfig.Port,
+		dbConfig.Database,
 		charset,
-		cfg.ParseTime,
+		dbConfig.ParseTime,
 	)
 }

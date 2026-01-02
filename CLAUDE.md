@@ -23,9 +23,10 @@ go build -o bin/server.exe ./cmd/server
 ./bin/server.exe
 ```
 
-### 依赖管理
+### Wire 依赖注入生成
 ```bash
-go mod tidy
+# 修改 wire.go 后重新生成
+wire gen ./cmd/server
 ```
 
 ### 健康检查
@@ -102,7 +103,12 @@ curl http://localhost:8080/api/v1/ping
 
 - **`pkg/validator`** - 请求参数验证
   - 封装 `go-playground/validator`
-  - 支持自定义验证规则
+  - 支持自定义验证规则（phone、password 等）
+
+- **`pkg/jwt`** - JWT 认证管理
+  - 支持双 Token 机制（Access Token + Refresh Token）
+  - Token 生成、解析、验证
+  - 支持自定义 Claims（包含 UserID、Username）
 
 ### 配置
 
@@ -112,7 +118,27 @@ curl http://localhost:8080/api/v1/ping
 - `database` - MySQL/GORM 连接池设置（host、port、username、password、database、charset、parse_time、max_idle_conns、max_open_conns、conn_max_lifetime、conn_max_idle_time、slow_threshold）
 - `redis` - Redis 连接设置（host、port、password、db、pool_size、min_idle_conn）
 - `logger` - 日志级别和文件轮转设置（level、file_name、max_size、max_backups、max_age、compress、console）
-- `jwt` - JWT 密钥和过期时间（secret、expire_time、issuer）
+- `jwt` - JWT 密钥和过期时间（secret、expire_time、refresh_expire_time、issuer）
+- `middleware` - 中间件配置（recovery、request_id、logger、cors、csrf、security、auth）
+
+### 依赖注入（Wire）
+
+项目使用 Google Wire 进行依赖注入，主要文件：
+
+- `cmd/server/wire.go` - Wire 依赖注入定义（`//go:build wireinject`）
+- `cmd/server/wire_gen.go` - Wire 自动生成的代码（无需手动编辑）
+
+**Wire ProviderSets 组织结构**：
+- `infraSet` - 基础设施（Config、DB、Redis、JWT）
+- `repoSet` - Repository 层
+- `serviceSet` - Service 层
+- `handlerSet` - Handler 层
+- `engineSet` - Gin Engine 及中间件
+
+**修改依赖后需要重新生成**：
+```bash
+wire gen ./cmd/server
+```
 
 ### 响应格式
 
@@ -174,21 +200,14 @@ err := errors.Wrap(dbErr, response.CodeDBError, "查询失败").WithCaller()
 
 1. **基础设施**（已完成）- config、logger、response、errors
 2. **数据访问**（已完成）- database、cache、validator
-3. **核心中间件**（进行中）- recovery、request ID、auth、security
-4. **分层架构实现** - handler/service/repository 实现
+3. **核心中间件**（已完成）- recovery、request_id、logger、cors、csrf、security、auth
+4. **分层架构实现**（已完成）- Wire 依赖注入、handler/service/repository
 5. **可观测性** - Swagger、健康检查、metrics
 6. **权限保护** - RBAC、限流、防暴力破解
 7. **工具包** - 加密、ID 生成器、时间/字符串工具
 8. **异步任务** - worker pools、定时任务、文件处理
 9. **容器化** - Docker、K8s 配置
 10. **CI/CD** - GitLab CI、测试、文档
-
-## 模块状态
-
-当前完成度：
-- [x] 阶段 1：基础设施（config、logger、response、errors）
-- [x] 阶段 2：数据访问（database、cache、validator）
-- [ ] 阶段 3-10：进行中
 
 ## 重要说明
 

@@ -6,11 +6,12 @@ import (
 
 // Config 全局配置结构
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server" validate:"required"`
-	Database DatabaseConfig `mapstructure:"database" validate:"required"`
-	Redis    RedisConfig    `mapstructure:"redis" validate:"required"`
-	Logger   LoggerConfig   `mapstructure:"logger" validate:"required"`
-	JWT      JWTConfig      `mapstructure:"jwt" validate:"required"`
+	Server    ServerConfig    `mapstructure:"server" validate:"required"`
+	Database  DatabaseConfig  `mapstructure:"database" validate:"required"`
+	Redis     RedisConfig     `mapstructure:"redis" validate:"required"`
+	Logger    LoggerConfig    `mapstructure:"logger" validate:"required"`
+	JWT       JWTConfig       `mapstructure:"jwt" validate:"required"`
+	Middleware MiddlewareConfig `mapstructure:"middleware" validate:"required"`
 }
 
 // ServerConfig 服务器配置
@@ -62,7 +63,112 @@ type LoggerConfig struct {
 
 // JWTConfig JWT配置
 type JWTConfig struct {
-	Secret     string        `mapstructure:"secret" validate:"required,min=16"`
-	ExpireTime time.Duration `mapstructure:"expire_time" validate:"required"`
-	Issuer     string        `mapstructure:"issuer" validate:"required"`
+	Secret        string        `mapstructure:"secret" validate:"required,min=16"`
+	ExpireTime   time.Duration `mapstructure:"expire_time" validate:"required"` // Access Token 过期时间
+	RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time" validate:"required"` // Refresh Token 过期时间
+	Issuer       string        `mapstructure:"issuer" validate:"required"`
+}
+
+// MiddlewareConfig 中间件配置
+type MiddlewareConfig struct {
+	Recovery  RecoveryConfig  `mapstructure:"recovery"`
+	RequestID RequestIDConfig `mapstructure:"request_id"`
+	Logger    LoggerMiddlewareConfig `mapstructure:"logger"`
+	CORS      CORSConfig      `mapstructure:"cors"`
+	CSRF      CSRFConfig      `mapstructure:"csrf"`
+	Security  SecurityConfig  `mapstructure:"security"`
+	Auth      AuthConfig      `mapstructure:"auth"`
+	Metrics   MetricsConfig   `mapstructure:"metrics"`
+}
+
+// RecoveryConfig Recovery中间件配置
+type RecoveryConfig struct {
+	// EnableStacktrace 是否启用堆栈信息记录（生产环境建议关闭）
+	EnableStacktrace bool `mapstructure:"enable_stacktrace"`
+}
+
+// RequestIDConfig RequestID中间件配置
+type RequestIDConfig struct {
+	// Header 请求ID的HTTP头字段名
+	Header string `mapstructure:"header"`
+	// SkipPaths 跳过生成RequestID的路径（如健康检查）
+	SkipPaths []string `mapstructure:"skip_paths"`
+}
+
+// LoggerMiddlewareConfig Logger中间件配置
+type LoggerMiddlewareConfig struct {
+	// SlowThreshold 慢请求阈值
+	SlowThreshold time.Duration `mapstructure:"slow_threshold"`
+	// SkipPaths 跳过日志记录的路径
+	SkipPaths []string `mapstructure:"skip_paths"`
+	// LogQuery 是否记录查询参数
+	LogQuery bool `mapstructure:"log_query"`
+}
+
+// CORSConfig CORS中间件配置
+type CORSConfig struct {
+	// AllowOrigins 允许的源
+	AllowOrigins []string `mapstructure:"allow_origins"`
+	// AllowMethods 允许的HTTP方法
+	AllowMethods []string `mapstructure:"allow_methods"`
+	// AllowHeaders 允许的请求头
+	AllowHeaders []string `mapstructure:"allow_headers"`
+	// ExposeHeaders 暴露的响应头
+	ExposeHeaders []string `mapstructure:"expose_headers"`
+	// AllowCredentials 是否允许携带凭证
+	AllowCredentials bool `mapstructure:"allow_credentials"`
+	// MaxAge 预检请求缓存时间（秒）
+	MaxAge int `mapstructure:"max_age"`
+}
+
+// CSRFConfig CSRF中间件配置
+type CSRFConfig struct {
+	// Enable 是否启用CSRF保护
+	Enable bool `mapstructure:"enable"`
+	// TokenLength Token长度
+	TokenLength int `mapstructure:"token_length"`
+	// TokenExpiry Token过期时间
+	TokenExpiry time.Duration `mapstructure:"token_expiry"`
+	// CookieName Cookie名称
+	CookieName string `mapstructure:"cookie_name"`
+	// HeaderName Header字段名
+	HeaderName string `mapstructure:"header_name"`
+	// TrustedOrigins 信任的源（跳过CSRF验证）
+	TrustedOrigins []string `mapstructure:"trusted_origins"`
+}
+
+// SecurityConfig 安全响应头配置
+type SecurityConfig struct {
+	// Enable 是否启用安全响应头
+	Enable bool `mapstructure:"enable"`
+	// XFrameOptions X-Frame-Options 响应头
+	XFrameOptions string `mapstructure:"x_frame_options"`
+	// XContent_type_Options X-Content-Type-Options 响应头
+	XContentTypeOptions string `mapstructure:"x_content_type_options"`
+	// XSSProtection X-XSS-Protection 响应头
+	XSSProtection string `mapstructure:"xss_protection"`
+	// HSTS HTTP Strict Transport Security
+	HSTS struct {
+		Enable        bool          `mapstructure:"enable"`
+		MaxAge        time.Duration `mapstructure:"max_age"`
+		IncludeSubDomains bool       `mapstructure:"include_subdomains"`
+	} `mapstructure:"hsts"`
+	// ContentSecurityPolicy CSP 响应头
+	ContentSecurityPolicy string `mapstructure:"content_security_policy"`
+	// ReferrerPolicy Referrer-Policy 响应头
+	ReferrerPolicy string `mapstructure:"referrer_policy"`
+}
+
+// AuthConfig Auth认证中间件配置
+type AuthConfig struct {
+	// SkipPaths 跳过认证的路径（白名单）
+	SkipPaths []string `mapstructure:"skip_paths"`
+}
+
+// MetricsConfig Metrics中间件配置
+type MetricsConfig struct {
+	// Enable 是否启用 Metrics
+	Enable bool `mapstructure:"enable"`
+	// SkipPaths 跳过统计的路径
+	SkipPaths []string `mapstructure:"skip_paths"`
 }

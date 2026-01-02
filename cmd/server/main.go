@@ -10,16 +10,33 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/xiaochangtongxue/my-gin/pkg/cache"
-	"github.com/xiaochangtongxue/my-gin/pkg/config"
+	_ "github.com/xiaochangtongxue/my-gin/docs" // Swagger 文档
+	"github.com/xiaochangtongxue/my-gin/internal/router"
 	"github.com/xiaochangtongxue/my-gin/pkg/database"
 	"github.com/xiaochangtongxue/my-gin/pkg/logger"
-	"github.com/xiaochangtongxue/my-gin/pkg/response"
 	"github.com/xiaochangtongxue/my-gin/pkg/validator"
 )
+
+// @title           My-Gin API
+// @version         1.0
+// @description     生产级 Gin 框架脚手架 API
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.example.com/support
+// @contact.email  support@example.com
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:8080
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 
 var (
 	configFile = flag.String("c", "configs/config.yaml", "配置文件路径")
@@ -28,21 +45,21 @@ var (
 func main() {
 	flag.Parse()
 
-	// 初始化配置
-	cfg, err := config.Init(*configFile)
+	// 使用 Wire 初始化应用程序（依赖注入）
+	app, err := InitializeApp(*configFile)
 	if err != nil {
-		panic(fmt.Sprintf("配置初始化失败: %v", err))
+		panic(fmt.Sprintf("应用程序初始化失败: %v", err))
 	}
 
-	// 初始化日志
+	// 初始化日志（需要在配置初始化后）
 	if err := logger.Init(&logger.Config{
-		Level:      cfg.Logger.Level,
-		FileName:   cfg.Logger.FileName,
-		MaxSize:    cfg.Logger.MaxSize,
-		MaxBackups: cfg.Logger.MaxBackups,
-		MaxAge:     cfg.Logger.MaxAge,
-		Compress:   cfg.Logger.Compress,
-		Console:    cfg.Logger.Console,
+		Level:      app.Config.Logger.Level,
+		FileName:   app.Config.Logger.FileName,
+		MaxSize:    app.Config.Logger.MaxSize,
+		MaxBackups: app.Config.Logger.MaxBackups,
+		MaxAge:     app.Config.Logger.MaxAge,
+		Compress:   app.Config.Logger.Compress,
+		Console:    app.Config.Logger.Console,
 	}); err != nil {
 		panic(fmt.Sprintf("日志初始化失败: %v", err))
 	}
@@ -51,49 +68,24 @@ func main() {
 	// 初始化验证器
 	validator.Init()
 
-	// 初始化数据库（可选，失败不阻止启动）
-	if err := database.Init(&cfg.Database); err != nil {
-		logger.Warn("数据库初始化失败（可选）", zap.Error(err))
-	} else {
-		logger.Info("数据库连接成功")
-		defer database.Close()
-	}
-
-	// 初始化Redis（可选，失败不阻止启动）
-	if err := cache.InitRedis(&cfg.Redis); err != nil {
-		logger.Warn("Redis初始化失败（可选）", zap.Error(err))
-	} else {
-		logger.Info("Redis连接成功")
-	}
-
 	logger.Info("服务启动中...",
-		zap.String("mode", cfg.Server.Mode),
-		zap.String("host", cfg.Server.Host),
-		zap.Int("port", cfg.Server.Port),
+		zap.String("mode", app.Config.Server.Mode),
+		zap.String("host", app.Config.Server.Host),
+		zap.Int("port", app.Config.Server.Port),
 	)
 
-	// 设置gin模式
-	gin.SetMode(cfg.Server.Mode)
-
-	// 创建引擎
-	engine := gin.New()
-
-	// 使用gin自带中间件（阶段3会替换为自定义中间件）
-	engine.Use(gin.Recovery())
-	engine.Use(gin.Logger())
-
 	// 注册路由
-	setupRouter(engine)
+	setupRoutes(app)
 
 	// 创建HTTP服务器
 	srv := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler:      engine,
-		ReadTimeout:  cfg.Server.ReadTimeout,
-		WriteTimeout: cfg.Server.WriteTimeout,
+		Addr:         fmt.Sprintf("%s:%d", app.Config.Server.Host, app.Config.Server.Port),
+		Handler:      app.Engine,
+		ReadTimeout:  app.Config.Server.ReadTimeout,
+		WriteTimeout: app.Config.Server.WriteTimeout,
 	}
 
-	// sql数据迁移
+	// 数据库迁移
 	database.Up()
 
 	// 启动服务器
@@ -118,64 +110,21 @@ func main() {
 		logger.Error("服务关闭失败", zap.Error(err))
 	}
 
+	// 关闭数据库连接
+	if err := database.Close(); err != nil {
+		logger.Error("数据库关闭失败", zap.Error(err))
+	}
+
 	logger.Info("服务已关闭")
 }
 
-// setupRouter 配置路由
-func setupRouter(engine *gin.Engine) {
-	// 健康检查
-	engine.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-			"time":   time.Now().Format(time.RFC3339),
-		})
-	})
+// setupRoutes 配置路由
+func setupRoutes(app *App) {
+	engine := app.Engine
 
-	// API路由组
-	api := engine.Group("/api")
-	{
-		v1 := api.Group("/v1")
-		{
-			// 示例接口
-			v1.GET("/ping", func(c *gin.Context) {
-				response.Success(c, gin.H{
-					"message": "pong",
-				})
-			})
-
-			// 示例：参数错误
-			v1.GET("/error", func(c *gin.Context) {
-				response.ParamError(c, "这是一个参数错误示例")
-			})
-
-			// 示例：业务错误
-			v1.GET("/business", func(c *gin.Context) {
-				response.Fail(c, 10001, "业务处理失败")
-			})
-
-			v1.POST("/register", func(c *gin.Context) {
-				var req RegisterRequest
-
-				// ShouldBindJSON 会自动触发我们在 validator.Init 中注册的验证器
-				if err := c.ShouldBindJSON(&req); err != nil {
-					// 调用封装好的翻译函数
-					errMsg := validator.TranslateError(err)
-					response.ParamError(c, errMsg)
-					return
-				}
-
-				// 验证通过，执行业务逻辑（如保存到 MySQL）
-				response.Success(c, gin.H{
-					"name": req.Username,
-				})
-			})
-		}
-	}
-}
-
-type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3" label:"用户名"`
-	Phone    string `json:"phone" binding:"required,phone" label:"手机号"`
-	Password string `json:"password" binding:"required,password" label:"密码"`
-	Email    string `json:"email" binding:"required,email" label:"电子邮箱"`
+	// 注册各模块路由
+	router.RegisterSwaggerRoutes(engine)            // Swagger 文档
+	router.RegisterHealthRoutes(engine, app.HealthHandler) // 健康检查
+	router.RegisterMetricsRoutes(engine)            // Prometheus Metrics
+	router.RegisterAuthRoutes(engine, app.AuthHandler)      // 认证路由
 }

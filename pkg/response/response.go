@@ -8,12 +8,13 @@ import (
 )
 
 // Response 标准响应结构
+// @description 统一 API 响应格式
 type Response struct {
-	Code      int         `json:"code"`                 // 业务状态码
-	Message   string      `json:"message"`              // 响应消息
-	Data      interface{} `json:"data,omitempty"`       // 响应数据
-	Timestamp int64       `json:"timestamp"`            // 时间戳
-	RequestID string      `json:"request_id,omitempty"` // 请求ID
+	Code      int         `json:"code" example:"0"`                        // 业务状态码
+	Message   string      `json:"message" example:"success"`               // 响应消息
+	Data      interface{} `json:"data,omitempty"`                          // 响应数据
+	Timestamp int64       `json:"timestamp" example:"1704067200"`          // 时间戳
+	RequestID string      `json:"request_id,omitempty" example:"abc123"`  // 请求ID
 }
 
 // PageData 分页数据结构

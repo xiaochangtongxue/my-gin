@@ -44,5 +44,96 @@ logger:
 # JWT配置
 jwt:
   secret: "your-secret-key-change-in-production"  # 密钥，生产环境请修改
-  expire_time: 24h     # 过期时间
-  issuer: "my-gin"     # 签发者
+  expire_time: 30m      # Access Token 过期时间（30分钟）
+  refresh_expire_time: 168h # Refresh Token 过期时间（7天）
+  issuer: "my-gin"       # 签发者
+
+# 中间件配置
+middleware:
+  # Recovery 异常恢复中间件配置
+  recovery:
+    enable_stacktrace: true  # 是否记录堆栈信息（生产环境建议设为false）
+
+  # RequestID 请求ID中间件配置
+  request_id:
+    header: "X-Request-ID"  # 请求ID的HTTP头字段名
+    skip_paths:             # 跳过生成 RequestID 的路径
+      - "/health"
+      - "/swagger"
+
+  # Logger 日志中间件配置
+  logger:
+    slow_threshold: 500ms   # 慢请求阈值
+    skip_paths:             # 跳过日志记录的路径
+      - "/health"
+      - "/metrics"
+      - "/swagger"          # Swagger 文档
+    log_query: true         # 是否记录查询参数
+
+  # CORS 跨域配置
+  cors:
+    allow_origins:
+      - "*"                  # 允许的源，* 表示允许所有（生产环境请指定具体域名）
+    allow_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+      - "PATCH"
+    allow_headers:
+      - "Origin"
+      - "Content-Type"
+      - "Accept"
+      - "Authorization"
+      - "X-Request-ID"
+    expose_headers:
+      - "Content-Length"
+      - "X-Request-ID"
+    allow_credentials: false # 是否允许携带凭证（allow_origins为*时必须为false）
+    max_age: 86400           # 预检请求缓存时间（秒），24小时
+
+  # CSRF 保护配置
+  csrf:
+    enable: false            # 是否启用CSRF保护
+    token_length: 32         # Token长度
+    token_expiry: 24h        # Token过期时间
+    cookie_name: "_csrf"     # Cookie名称
+    header_name: "X-CSRF-Token"  # Header字段名
+    trusted_origins:         # 信任的源（跳过CSRF验证）
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+
+  # Security 安全响应头配置
+  security:
+    enable: true             # 是否启用安全响应头
+    x_frame_options: "DENY"  # 防止点击劫持
+    x_content_type_options: "nosniff"  # 防止MIME类型嗅探
+    xss_protection: "1; mode=block"    # XSS保护
+    hsts:
+      enable: true           # 是否启用HSTS
+      max_age: 31536000      # HSTS有效期（秒），1年
+      include_subdomains: true  # 是否包含子域名
+    content_security_policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+    referrer_policy: "strict-origin-when-cross-origin"
+
+  # Auth 认证中间件配置
+  auth:
+    skip_paths:              # 跳过认证的路径（白名单）
+      - "/health"
+      - "/api/v1/ping"
+      - "/api/v1/register"
+      - "/api/v1/login"
+      - "/api/v1/refresh"     # 刷新Token接口
+      - "/swagger"            # Swagger 文档（前缀匹配）
+      - "/metrics"
+
+  # Metrics 指标收集中间件配置
+  metrics:
+    enable: true             # 是否启用 Metrics
+    skip_paths:              # 跳过统计的路径
+      - "/health"
+      - "/health/ready"
+      - "/health/live"
+      - "/metrics"
+      - "/swagger"
