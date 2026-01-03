@@ -6,6 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"github.com/xiaochangtongxue/my-gin/pkg/captcha"
+	"github.com/xiaochangtongxue/my-gin/pkg/notify"
+	"github.com/xiaochangtongxue/my-gin/pkg/utils"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+	"strconv"
 	"time"
 
 	"github.com/xiaochangtongxue/my-gin/internal/model"
@@ -26,6 +33,20 @@ var (
 	ErrRefreshTokenExpired = errors.New("refresh token 已过期")
 )
 
+type AuthService interface {
+	// Register 用户注册
+	Register(ctx context.Context, mobile, username, password string) (*RegisterResult, error)
+
+	// Login 用户登录
+	Login(ctx context.Context, mobile, password, captchaID, captchaCode, ip string) (*LoginResult, error)
+
+	//返回新的 TokenPair
+	RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error)
+
+	// LogoutWithAccessToken 登出（删除 RT 并将 AT 加入黑名单）
+	LogoutWithAccessToken(ctx context.Context, accessToken, refreshToken string) error
+}
+
 // Config 认证服务配置
 type Config struct {
 	AccessTokenExpire  time.Duration // Access Token 过期时间
@@ -35,17 +56,37 @@ type Config struct {
 // TokenPair 双 Token 结构
 // @description 双 Token 响应（Access Token + Refresh Token）
 type TokenPair struct {
-	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`  // Access Token
-	RefreshToken string `json:"refresh_token" example:"a1b2c3d4e5f6..."`                         // Refresh Token
-	ExpiresIn    int64  `json:"expires_in" example:"1800"`                                       // Access Token 过期时间（秒）
+	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."` // Access Token
+	RefreshToken string `json:"refresh_token" example:"a1b2c3d4e5f6..."`                        // Refresh Token
+	ExpiresIn    int64  `json:"expires_in" example:"1800"`                                      // Access Token 过期时间（秒）
+}
+
+// RegisterResult 注册结果
+type RegisterResult struct {
+	UID      uint64
+	Username string
+}
+
+// LoginResult 登录结果
+type LoginResult struct {
+	UID          uint64
+	Username     string
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int64
 }
 
 // AuthService 认证服务
-type AuthService struct {
-	rtRepo    repository.RefreshTokenRepository
-	cache     cache.Cache
-	jwtMgr    *jwt.Manager
-	refreshTTL time.Duration
+type authService struct {
+	rtRepo      repository.RefreshTokenRepository
+	cache       cache.Cache
+	jwtMgr      *jwt.Manager
+	refreshTTL  time.Duration
+	userRepo    repository.UserRepository
+	securitySvc SecurityService
+	captcha     *captcha.Captcha
+	notify      notify.Notifier
+	bcryptCost  int
 }
 
 // NewAuthService 创建认证服务
@@ -54,46 +95,159 @@ func NewAuthService(
 	cache cache.Cache,
 	jwtMgr *jwt.Manager,
 	cfg Config,
-) *AuthService {
-	return &AuthService{
-		rtRepo:    rtRepo,
-		cache:     cache,
-		jwtMgr:    jwtMgr,
-		refreshTTL: cfg.RefreshTokenExpire,
+	userRepo repository.UserRepository,
+	securitySvc SecurityService,
+	captcha *captcha.Captcha,
+	notify notify.Notifier,
+	bcryptCost int,
+) *authService {
+	if bcryptCost == 0 {
+		bcryptCost = bcrypt.DefaultCost
+	}
+	return &authService{
+		rtRepo:      rtRepo,
+		cache:       cache,
+		jwtMgr:      jwtMgr,
+		refreshTTL:  cfg.RefreshTokenExpire,
+		userRepo:    userRepo,
+		securitySvc: securitySvc,
+		captcha:     captcha,
+		notify:      notify,
+		bcryptCost:  bcryptCost,
 	}
 }
 
-// Login 用户登录（生成双 Token）
-// userID: 用户 ID
-// username: 用户名
-// 返回 TokenPair（AT + RT）
-func (s *AuthService) Login(ctx context.Context, userID uint, username string) (*TokenPair, error) {
-	// 1. 生成 Access Token
-	accessToken, err := s.jwtMgr.GenerateToken(userID, username)
+func (s *authService) Register(ctx context.Context, mobile, username, password string) (*RegisterResult, error) {
+	// 1. 检查手机号是否已注册
+	exist, err := s.userRepo.ExistsByMobile(ctx, mobile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("检查手机号失败: %w", err)
+	}
+	if exist {
+		return nil, errors.New("该手机号已注册")
 	}
 
-	// 2. 生成 Refresh Token（随机字符串）
+	// 2. 检查用户名是否已存在
+	exist, err = s.userRepo.ExistsByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("检查用户名失败: %w", err)
+	}
+	if exist {
+		return nil, errors.New("用户名已存在")
+	}
+
+	// 3. 密码加密
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("密码加密失败: %w", err)
+	}
+
+	// 4. 创建用户
+	user := &model.User{
+		Mobile:   mobile,
+		Username: username,
+		Password: string(hash),
+	}
+	if err := s.userRepo.Create(ctx, user); err != nil {
+		return nil, fmt.Errorf("创建用户失败: %w", err)
+	}
+
+	// 5. 生成UID（Feistel混淆自增ID）
+	user.UID = utils.EncodeUID(user.ID)
+	if err := s.userRepo.UpdateUID(ctx, user.ID, user.UID); err != nil {
+		return nil, fmt.Errorf("更新用户UID失败: %w", err)
+	}
+
+	// 6. 发送注册成功通知（异步，不阻塞）
+	go func() {
+		_ = s.notify.SendRegisterNotice(context.Background(), mobile, username)
+	}()
+
+	return &RegisterResult{
+		UID:      user.UID,
+		Username: user.Username,
+	}, nil
+}
+
+// Login 用户登录
+func (s *authService) Login(ctx context.Context, mobile, password, captchaID, captchaCode, ip string) (*LoginResult, error) {
+	// 1. 根据手机号查用户
+	user, err := s.userRepo.FindByMobile(ctx, mobile)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("用户不存在")
+		}
+		return nil, fmt.Errorf("查询用户失败: %w", err)
+	}
+
+	uid := strconv.FormatUint(user.UID, 10)
+
+	// 2. 检查IP是否在黑名单中
+	blacklisted, err := s.securitySvc.IsIPBlacklisted(ctx, ip)
+	if err != nil {
+		return nil, fmt.Errorf("检查黑名单失败: %w", err)
+	}
+	if blacklisted {
+		return nil, errors.New("IP已被封禁，请联系管理员")
+	}
+
+	// 3. 检查账号是否被锁定
+	locked, err := s.securitySvc.IsAccountLocked(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("检查锁定状态失败: %w", err)
+	}
+	if locked {
+		ttl, _ := s.securitySvc.GetLockTimeRemaining(ctx, uid)
+		return nil, fmt.Errorf("账号已锁定，请%d分钟后再试", ttl)
+	}
+
+	// 4. 检查是否需要验证码
+	needCaptcha, err := s.securitySvc.NeedCaptcha(ctx, ip, uid)
+	if err != nil {
+		return nil, fmt.Errorf("检查验证码状态失败: %w", err)
+	}
+	if needCaptcha {
+		if captchaID == "" || captchaCode == "" {
+			return nil, errors.New("请输入验证码")
+		}
+		if !s.captcha.Verify(ctx, captchaID, captchaCode) {
+			return nil, errors.New("验证码错误或已过期")
+		}
+	}
+
+	// 5. 验证密码
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		// 密码错误：记录失败
+		_ = s.securitySvc.RecordFailure(ctx, ip, uid)
+		return nil, errors.New("用户名或密码错误")
+	}
+
+	// 6. 密码正确：清除失败记录
+	_ = s.securitySvc.ClearFailures(ctx, ip, uid)
+
+	// 7. 生成Token
+	accessToken, err := s.jwtMgr.GenerateToken(user.UID, user.Username)
+	if err != nil {
+		return nil, fmt.Errorf("生成Token失败: %w", err)
+	}
+
+	// 8. 生成RefreshToken
 	refreshToken, err := generateRefreshToken()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("生成刷新Token失败: %w", err)
 	}
 
-	// 3. 存储 Refresh Token 到数据库
-	expiresAt := time.Now().Add(s.refreshTTL)
-
-	rt := &model.RefreshToken{
-		UserID:    userID,
+	// 9. 把生成的RefreshToken存储到数据库
+	newRT := &model.RefreshToken{
+		UserID:    user.UID,
 		Token:     refreshToken,
-		ExpiresAt: expiresAt,
+		ExpiresAt: time.Now().Add(s.refreshTTL),
 	}
+	s.rtRepo.Create(ctx, newRT)
 
-	if err := s.rtRepo.Create(ctx, rt); err != nil {
-		return nil, err
-	}
-
-	return &TokenPair{
+	return &LoginResult{
+		UID:          user.UID,
+		Username:     user.Username,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    int64(s.jwtMgr.GetExpireTime().Seconds()),
@@ -103,7 +257,7 @@ func (s *AuthService) Login(ctx context.Context, userID uint, username string) (
 // RefreshToken 刷新 Access Token
 // refreshToken: 客户端携带的 Refresh Token
 // 返回新的 TokenPair
-func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
 	// 1. 验证 Refresh Token 是否有效（未过期且未删除）
 	valid, err := s.rtRepo.IsValidToken(ctx, refreshToken)
 	if err != nil || !valid {
@@ -147,16 +301,6 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 	}, nil
 }
 
-// Logout 登出（删除 Refresh Token）
-func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
-	return s.rtRepo.DeleteByToken(ctx, refreshToken)
-}
-
-// LogoutByUser 登出用户的所有设备
-func (s *AuthService) LogoutByUser(ctx context.Context, userID uint) error {
-	return s.rtRepo.DeleteByUser(ctx, userID)
-}
-
 // generateRefreshToken 生成随机 Refresh Token
 func generateRefreshToken() (string, error) {
 	b := make([]byte, 32)
@@ -167,7 +311,7 @@ func generateRefreshToken() (string, error) {
 }
 
 // LogoutWithAccessToken 登出（删除 RT 并将 AT 加入黑名单）
-func (s *AuthService) LogoutWithAccessToken(ctx context.Context, accessToken, refreshToken string) error {
+func (s *authService) LogoutWithAccessToken(ctx context.Context, accessToken, refreshToken string) error {
 	// 删除 Refresh Token
 	_ = s.rtRepo.DeleteByToken(ctx, refreshToken)
 
@@ -181,23 +325,8 @@ func (s *AuthService) LogoutWithAccessToken(ctx context.Context, accessToken, re
 	return nil
 }
 
-// LogoutAllWithAccessToken 登出所有设备（删除用户所有 RT 并将当前 AT 加入黑名单）
-func (s *AuthService) LogoutAllWithAccessToken(ctx context.Context, accessToken string, userID uint) error {
-	// 删除用户的所有 Refresh Token
-	_ = s.rtRepo.DeleteByUser(ctx, userID)
-
-	// 将当前 Access Token 加入黑名单
-	if accessToken != "" && s.cache != nil {
-		claims, err := s.jwtMgr.ParseToken(accessToken)
-		if err == nil {
-			_ = s.addTokenToBlacklist(ctx, accessToken, claims)
-		}
-	}
-	return nil
-}
-
 // addTokenToBlacklist 将 Token 加入黑名单
-func (s *AuthService) addTokenToBlacklist(ctx context.Context, token string, claims *jwt.Claims) error {
+func (s *authService) addTokenToBlacklist(ctx context.Context, token string, claims *jwt.Claims) error {
 	if s.cache == nil {
 		return nil
 	}

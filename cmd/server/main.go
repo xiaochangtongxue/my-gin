@@ -123,8 +123,10 @@ func setupRoutes(app *App) {
 	engine := app.Engine
 
 	// 注册各模块路由
-	router.RegisterSwaggerRoutes(engine)            // Swagger 文档
-	router.RegisterHealthRoutes(engine, app.HealthHandler) // 健康检查
-	router.RegisterMetricsRoutes(engine)            // Prometheus Metrics
-	router.RegisterAuthRoutes(engine, app.AuthHandler)      // 认证路由
+	router.RegisterSwaggerRoutes(engine)                                                                    // Swagger 文档
+	router.RegisterHealthRoutes(engine, app.HealthHandler)                                                  // 健康检查
+	router.RegisterMetricsRoutes(engine)                                                                    // Prometheus Metrics
+	router.RegisterAuthRoutes(engine, app.AuthHandler, app.CaptchaHandler)                                  // 认证路由
+	router.RegisterSecurityRoutes(engine, app.SecurityHandler, app.PermissionChecker, app.UserRoleRepo)     // 安全管理路由
+	router.RegisterPermissionRoutes(engine, app.PermissionHandler, app.PermissionChecker, app.UserRoleRepo) // 权限管理路由
 }

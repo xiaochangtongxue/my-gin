@@ -97,29 +97,32 @@ func TranslateError(err error) string {
 // registerCustomValidators 注册自定义验证器及其中文翻译
 func registerCustomValidators() {
 	// 注册手机号验证器
-	_ = validate.RegisterValidation("phone", validatePhone)
+	_ = validate.RegisterValidation("mobile", validateMobile)
 	// 注册身份证号验证器
 	_ = validate.RegisterValidation("idcard", validateIDCard)
-	// 注册密码强度验证器
+	// 注册密码强度验证器（至少8位，包含字母、数字、特殊字符）
 	_ = validate.RegisterValidation("password", validatePassword)
+	// 注册用户名验证器（1-20位，中文、英文、数字、下划线）
+	_ = validate.RegisterValidation("username", validateUsername)
 
 	// 2. 注册翻译 (关键步骤)
-	registerTagTranslation("phone", "{0}格式不合法")
+	registerTagTranslation("mobile", "{0}格式不合法")
 	registerTagTranslation("idcard", "{0}格式不正确")
-	registerTagTranslation("password", "{0}必须包含字母和数字，且长度不小于8位")
+	registerTagTranslation("password", "{0}至少8位，必须包含字母、数字和特殊字符(!@#$%^&*)")
+	registerTagTranslation("username", "{0}只能包含中英文、数字、下划线，长度1-20位")
 }
 
-// validatePhone 手机号验证
-func validatePhone(fl validator.FieldLevel) bool {
-	phone := fl.Field().String()
-	if len(phone) != 11 {
+// validateMobile 手机号验证
+func validateMobile(fl validator.FieldLevel) bool {
+	mobile := fl.Field().String()
+	if len(mobile) != 11 {
 		return false
 	}
 	// 简单验证：1开头，第二位为3-9
-	if phone[0] != '1' {
+	if mobile[0] != '1' {
 		return false
 	}
-	second := phone[1]
+	second := mobile[1]
 	return second >= '3' && second <= '9'
 }
 
@@ -139,24 +142,55 @@ func validateIDCard(fl validator.FieldLevel) bool {
 	return (last >= '0' && last <= '9') || last == 'X' || last == 'x'
 }
 
-// validatePassword 密码强度验证（至少8位，包含字母和数字）
+// validatePassword 密码强度验证（至少8位，包含字母、数字、特殊字符）
 func validatePassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
 	if len(password) < 8 {
 		return false
 	}
 
-	var hasLetter, hasDigit bool
+	var hasLetter, hasDigit, hasSpecial bool
+	specialChars := "!@#$%^&*"
 	for _, c := range password {
-		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+		switch {
+		case (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'):
 			hasLetter = true
-		}
-		if c >= '0' && c <= '9' {
+		case c >= '0' && c <= '9':
 			hasDigit = true
+		default:
+			// 检查是否为允许的特殊字符
+			for _, s := range specialChars {
+				if c == s {
+					hasSpecial = true
+					break
+				}
+			}
 		}
 	}
 
-	return hasLetter && hasDigit
+	return hasLetter && hasDigit && hasSpecial
+}
+
+// validateUsername 用户名验证（1-20位，中文、英文、数字、下划线）
+func validateUsername(fl validator.FieldLevel) bool {
+	username := fl.Field().String()
+	if username == "" || len(username) > 20 {
+		return false
+	}
+
+	// 检查每个字符：中文、英文、数字、下划线
+	for _, r := range username {
+		isValid := (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_' ||
+			(r >= 0x4e00 && r <= 0x9fff) // 中文字符范围
+		if !isValid {
+			return false
+		}
+	}
+
+	return true
 }
 
 // 辅助函数：快速注册标签翻译
@@ -194,12 +228,14 @@ func GetErrorMsg(field, tag string) string {
 		return field + "为必填项"
 	case "email":
 		return field + "格式不正确"
-	case "phone":
+	case "mobile":
 		return field + "格式不正确"
 	case "idcard":
 		return field + "格式不正确"
 	case "password":
-		return field + "强度不足（至少8位，包含字母和数字）"
+		return field + "至少8位，必须包含字母、数字和特殊字符"
+	case "username":
+		return field + "只能包含中英文、数字、下划线，长度1-20位"
 	case "min":
 		return field + "长度不足"
 	case "max":

@@ -120,12 +120,12 @@ func authWithOptions(skipPaths []string, jwtMgr *jwt.Manager, blacklistCache cac
 		}
 
 		// 将用户信息存入 Context，供后续处理器使用
-		c.Set(UserIDKey, claims.UserID)
+		c.Set(UserIDKey, claims.UID)
 		c.Set(UsernameKey, claims.Username)
 
 		logger.Debug("Token 验证成功",
 			zap.String("request_id", GetRequestID(c)),
-			zap.Uint("user_id", claims.UserID),
+			zap.Uint64("uid", claims.UID),
 			zap.String("username", claims.Username),
 		)
 
@@ -174,7 +174,7 @@ func AuthOptional() gin.HandlerFunc {
 		}
 
 		// Token 有效，将用户信息存入 Context
-		c.Set(UserIDKey, claims.UserID)
+		c.Set(UserIDKey, claims.UID)
 		c.Set(UsernameKey, claims.Username)
 
 		c.Next()
@@ -254,7 +254,7 @@ func extractToken(c *gin.Context) string {
 
 	// 检查是否为 Bearer Token 格式
 	if strings.HasPrefix(authHeader, BearerPrefix) {
-		return strings.TrimPrefix(authHeader, BearerPrefix)
+		return strings.TrimSpace(strings.TrimPrefix(authHeader, BearerPrefix))
 	}
 
 	// 从查询参数获取（备用方案）

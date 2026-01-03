@@ -28,11 +28,16 @@ type DefaultMiddleware struct {
 	EnableAuth bool
 	// EnableMetrics 是否启用 Metrics 中间件
 	EnableMetrics bool
+	// EnableRateLimit 是否启用 RateLimit 限流中间件
+	EnableRateLimit bool
 
 	// AuthConfig 认证中间件配置（EnableAuth=true 时需要）
 	AuthSkipPaths []string     // 跳过认证的路径
 	AuthJWTMgr    *jwt.Manager // JWT 管理器
 	AuthCache     cache.Cache  // 黑名单缓存
+
+	// RateLimitConfig 限流中间件配置（EnableRateLimit=true 时需要）
+	RateLimitCache cache.Cache // 限流缓存
 }
 
 // ApplyWithConfig 使用自定义配置应用中间件
@@ -45,6 +50,7 @@ func ApplyWithConfig(engine *gin.Engine, cfg *config.Config, middlewareConfig De
 	InitCORS(cfg)
 	InitSecurity(cfg)
 	InitCSRF(cfg)
+	InitRateLimit(cfg, middlewareConfig.RateLimitCache)
 
 	// Recovery 必须在最前面，用于捕获后续中间件的 panic
 	if middlewareConfig.EnableRecovery {
@@ -90,6 +96,11 @@ func ApplyWithConfig(engine *gin.Engine, cfg *config.Config, middlewareConfig De
 		engine.Use(MetricsWithConfig(metrics.Config{
 			SkipPaths: cfg.Middleware.Metrics.SkipPaths,
 		}))
+	}
+
+	// RateLimit 限流（在 Logger 之前，避免记录被拒绝的请求）
+	if middlewareConfig.EnableRateLimit {
+		engine.Use(RateLimit())
 	}
 
 	// 请求日志（放在最后，记录所有中间件处理完成后的信息）

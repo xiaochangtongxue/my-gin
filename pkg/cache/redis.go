@@ -222,6 +222,16 @@ func (r *RedisCache) ZRem(ctx context.Context, key string, members ...interface{
 	return r.client.ZRem(ctx, key, members...).Err()
 }
 
+// ZCard 有序集合获取元素数量
+func (r *RedisCache) ZCard(ctx context.Context, key string) (int64, error) {
+	return r.client.ZCard(ctx, key).Result()
+}
+
+// ZRemRangeByScore 有序集合按分数范围删除
+func (r *RedisCache) ZRemRangeByScore(ctx context.Context, key string, min, max float64) (int64, error) {
+	return r.client.ZRemRangeByScore(ctx, key, fmt.Sprintf("%f", min), fmt.Sprintf("%f", max)).Result()
+}
+
 // ZRange 有序集合按索引范围获取成员
 func (r *RedisCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
 	return r.client.ZRange(ctx, key, start, stop).Result()
@@ -238,6 +248,26 @@ func (r *RedisCache) ZRangeByScore(ctx context.Context, key string, min, max flo
 // ZIncrBy 有序集合成员分数增加
 func (r *RedisCache) ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error) {
 	return r.client.ZIncrBy(ctx, key, increment, member).Result()
+}
+
+// HMGet 哈希表批量获取字段
+func (r *RedisCache) HMGet(ctx context.Context, key string, fields ...string) ([]interface{}, error) {
+	return r.client.HMGet(ctx, key, fields...).Result()
+}
+
+// HMSet 哈希表批量设置字段
+func (r *RedisCache) HMSet(ctx context.Context, key string, values map[string]interface{}) error {
+	return r.client.HMSet(ctx, key, values).Err()
+}
+
+// Eval 执行 Lua 脚本
+func (r *RedisCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+	return r.client.Eval(ctx, script, keys, args...).Result()
+}
+
+// EvalSHA 执行已缓存的 Lua 脚本（通过 SHA）
+func (r *RedisCache) EvalSHA(ctx context.Context, sha string, keys []string, args ...interface{}) (interface{}, error) {
+	return r.client.EvalSha(ctx, sha, keys, args...).Result()
 }
 
 // Close 关闭连接

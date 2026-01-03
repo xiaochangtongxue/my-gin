@@ -6,12 +6,16 @@ import (
 
 // Config 全局配置结构
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server" validate:"required"`
-	Database  DatabaseConfig  `mapstructure:"database" validate:"required"`
-	Redis     RedisConfig     `mapstructure:"redis" validate:"required"`
-	Logger    LoggerConfig    `mapstructure:"logger" validate:"required"`
-	JWT       JWTConfig       `mapstructure:"jwt" validate:"required"`
-	Middleware MiddlewareConfig `mapstructure:"middleware" validate:"required"`
+	Server     ServerConfig      `mapstructure:"server" validate:"required"`
+	Database   DatabaseConfig    `mapstructure:"database" validate:"required"`
+	Redis      RedisConfig       `mapstructure:"redis" validate:"required"`
+	Logger     LoggerConfig      `mapstructure:"logger" validate:"required"`
+	JWT        JWTConfig         `mapstructure:"jwt" validate:"required"`
+	Password   PasswordConfig    `mapstructure:"password" validate:"required"`
+	Captcha    CaptchaConfig     `mapstructure:"captcha" validate:"required"`
+	Bruteforce BruteforceConfig  `mapstructure:"bruteforce" validate:"required"`
+	Middleware MiddlewareConfig  `mapstructure:"middleware" validate:"required"`
+	Permission PermissionConfig  `mapstructure:"permission" validate:"required"`
 }
 
 // ServerConfig 服务器配置
@@ -71,14 +75,15 @@ type JWTConfig struct {
 
 // MiddlewareConfig 中间件配置
 type MiddlewareConfig struct {
-	Recovery  RecoveryConfig  `mapstructure:"recovery"`
-	RequestID RequestIDConfig `mapstructure:"request_id"`
+	Recovery  RecoveryConfig   `mapstructure:"recovery"`
+	RequestID RequestIDConfig  `mapstructure:"request_id"`
 	Logger    LoggerMiddlewareConfig `mapstructure:"logger"`
-	CORS      CORSConfig      `mapstructure:"cors"`
-	CSRF      CSRFConfig      `mapstructure:"csrf"`
-	Security  SecurityConfig  `mapstructure:"security"`
-	Auth      AuthConfig      `mapstructure:"auth"`
-	Metrics   MetricsConfig   `mapstructure:"metrics"`
+	CORS      CORSConfig       `mapstructure:"cors"`
+	CSRF      CSRFConfig       `mapstructure:"csrf"`
+	Security  SecurityConfig   `mapstructure:"security"`
+	Auth      AuthConfig       `mapstructure:"auth"`
+	Metrics   MetricsConfig    `mapstructure:"metrics"`
+	RateLimit RateLimitConfig  `mapstructure:"ratelimit"`
 }
 
 // RecoveryConfig Recovery中间件配置
@@ -171,4 +176,56 @@ type MetricsConfig struct {
 	Enable bool `mapstructure:"enable"`
 	// SkipPaths 跳过统计的路径
 	SkipPaths []string `mapstructure:"skip_paths"`
+}
+
+// RateLimitConfig 限流中间件配置
+type RateLimitConfig struct {
+	// Enable 是否启用限流
+	Enable bool `mapstructure:"enable"`
+	// Global 全局限流配置
+	Global RateLimitItem `mapstructure:"global"`
+	// IP IP限流配置
+	IP RateLimitItem `mapstructure:"ip"`
+	// User 用户限流配置
+	User RateLimitItem `mapstructure:"user"`
+}
+
+// RateLimitItem 限流项配置
+type RateLimitItem struct {
+	Rate  float64 `mapstructure:"rate"`  // 每秒请求数
+	Burst int      `mapstructure:"burst"` // 突发流量
+}
+
+// PasswordConfig 密码配置
+type PasswordConfig struct {
+	MinLength     int `mapstructure:"min_length" validate:"min=6"`     // 最小长度
+	RequireLetter bool `mapstructure:"require_letter"`                // 必须包含字母
+	RequireDigit  bool `mapstructure:"require_digit"`                 // 必须包含数字
+	RequireSpecial bool `mapstructure:"require_special"`              // 必须包含特殊字符
+	BcryptCost    int `mapstructure:"bcrypt_cost" validate:"min=4,max=12"` // bcrypt强度
+}
+
+// CaptchaConfig 验证码配置
+type CaptchaConfig struct {
+	Length int           `mapstructure:"length" validate:"min=4,max=8"` // 验证码长度
+	Width  int           `mapstructure:"width" validate:"min=50"`       // 图片宽度
+	Height int           `mapstructure:"height" validate:"min=20"`      // 图片高度
+	Expire time.Duration `mapstructure:"expire" validate:"required"`   // 过期时间
+}
+
+// BruteforceConfig 防暴力破解配置
+type BruteforceConfig struct {
+	Enable            bool          `mapstructure:"enable"`             // 是否启用
+	MaxAttempts       int           `mapstructure:"max_attempts"`       // 最大尝试次数
+	LockDuration      time.Duration `mapstructure:"lock_duration"`      // 锁定时长
+	Window            time.Duration `mapstructure:"window"`             // 时间窗口
+	BlacklistDuration time.Duration `mapstructure:"blacklist_duration"` // 黑名单时长
+}
+
+// PermissionConfig 权限控制配置
+type PermissionConfig struct {
+	// Model 权限模型：rbac, abac, acl
+	Model string `mapstructure:"model" validate:"oneof=rbac abac acl"`
+	// ModelFile Casbin 模型文件路径
+	ModelFile string `mapstructure:"model_file"`
 }

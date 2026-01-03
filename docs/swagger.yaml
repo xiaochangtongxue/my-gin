@@ -1,5 +1,80 @@
 definitions:
-  github_com_xiaochangtongxue_my-gin_internal_dto_req.RefreshTokenReq:
+  req.AddPermissionReq:
+    properties:
+      action:
+        description: 操作
+        enum:
+        - read
+        - create
+        - update
+        - delete
+        - '*'
+        example: read
+        type: string
+      resource:
+        description: 资源路径
+        example: /api/v1/articles
+        type: string
+    required:
+    - action
+    - resource
+    type: object
+  req.AssignRoleReq:
+    properties:
+      role_id:
+        description: 角色ID
+        example: 3
+        type: integer
+    required:
+    - role_id
+    type: object
+  req.CreateRoleReq:
+    properties:
+      code:
+        description: 角色编码
+        example: editor
+        maxLength: 50
+        minLength: 1
+        type: string
+      description:
+        description: 角色描述
+        example: 内容编辑人员
+        maxLength: 255
+        type: string
+      name:
+        description: 角色名称
+        example: 编辑
+        maxLength: 50
+        minLength: 1
+        type: string
+      sort_order:
+        description: 排序
+        example: 10
+        minimum: 0
+        type: integer
+    required:
+    - code
+    - name
+    type: object
+  req.LoginReq:
+    properties:
+      captcha_code:
+        description: 验证码（可选）
+        type: string
+      captcha_id:
+        description: 验证码ID（可选）
+        type: string
+      mobile:
+        description: 手机号
+        type: string
+      password:
+        description: 密码
+        type: string
+    required:
+    - mobile
+    - password
+    type: object
+  req.RefreshTokenReq:
     properties:
       refresh_token:
         description: Refresh Token
@@ -7,7 +82,67 @@ definitions:
     required:
     - refresh_token
     type: object
-  github_com_xiaochangtongxue_my-gin_internal_dto_resp.Check:
+  req.RegisterReq:
+    properties:
+      mobile:
+        description: 手机号
+        type: string
+      password:
+        description: 密码
+        type: string
+      username:
+        description: 用户名
+        type: string
+    required:
+    - mobile
+    - password
+    - username
+    type: object
+  req.UpdateRoleReq:
+    properties:
+      code:
+        description: 角色编码
+        example: editor
+        maxLength: 50
+        minLength: 1
+        type: string
+      description:
+        description: 角色描述
+        example: 内容编辑人员
+        maxLength: 255
+        type: string
+      name:
+        description: 角色名称
+        example: 编辑
+        maxLength: 50
+        minLength: 1
+        type: string
+      sort_order:
+        description: 排序
+        example: 10
+        minimum: 0
+        type: integer
+      status:
+        description: 状态：0禁用 1启用
+        enum:
+        - 0
+        - 1
+        example: 1
+        type: integer
+    required:
+    - code
+    - name
+    type: object
+  resp.CaptchaResp:
+    properties:
+      captcha_id:
+        description: 验证码ID
+        type: string
+      captcha_image:
+        description: base64图片
+        type: string
+    type: object
+  resp.Check:
     description: 组件健康状态
     properties:
       error:
@@ -22,7 +157,7 @@ definitions:
         example: up
         type: string
     type: object
-  github_com_xiaochangtongxue_my-gin_internal_dto_resp.CheckResponse:
+  resp.CheckResponse:
     description: 简化版健康检查响应
     properties:
       status:
@@ -32,12 +167,45 @@ definitions:
         example: 2025-01-02T15:04:05Z07:00
         type: string
     type: object
-  github_com_xiaochangtongxue_my-gin_internal_dto_resp.ReadyResponse:
+  resp.LoginResp:
+    properties:
+      access_token:
+        description: Access Token
+        type: string
+      expires_in:
+        description: Access Token 过期时间（秒）
+        type: integer
+      refresh_token:
+        description: Refresh Token
+        type: string
+      uid:
+        description: 对外用户ID
+        type: string
+      username:
+        description: 用户名
+        type: string
+    type: object
+  resp.PermissionResp:
+    properties:
+      action:
+        description: 操作
+        example: read
+        type: string
+      id:
+        description: 策略ID
+        example: 1
+        type: integer
+      resource:
+        description: 资源路径
+        example: /api/v1/articles
+        type: string
+    type: object
+  resp.ReadyResponse:
     description: 完整版健康检查响应（包含各组件状态）
     properties:
       checks:
         additionalProperties:
-          $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_resp.Check'
+          $ref: '#/definitions/resp.Check'
         type: object
       status:
         example: healthy
@@ -49,23 +217,51 @@ definitions:
         example: 1.0.0
         type: string
     type: object
-  github_com_xiaochangtongxue_my-gin_internal_service.TokenPair:
-    description: 双 Token 响应（Access Token + Refresh Token）
+  resp.RegisterResp:
     properties:
-      access_token:
-        description: Access Token
-        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      uid:
+        description: 对外用户ID
         type: string
-      expires_in:
-        description: Access Token 过期时间（秒）
-        example: 1800
-        type: integer
-      refresh_token:
-        description: Refresh Token
-        example: a1b2c3d4e5f6...
+      username:
+        description: 用户名
         type: string
     type: object
-  github_com_xiaochangtongxue_my-gin_pkg_response.Response:
+  resp.RoleResp:
+    properties:
+      built_in:
+        description: 是否内置角色
+        example: 0
+        type: integer
+      code:
+        description: 角色编码
+        example: editor
+        type: string
+      created_at:
+        description: 创建时间
+        example: "2024-01-01T00:00:00Z"
+        type: string
+      description:
+        description: 角色描述
+        example: 内容编辑人员
+        type: string
+      id:
+        description: 角色ID
+        example: 1
+        type: integer
+      name:
+        description: 角色名称
+        example: 编辑
+        type: string
+      sort_order:
+        description: 排序
+        example: 10
+        type: integer
+      status:
+        description: 状态：0禁用 1启用
+        example: 1
+        type: integer
+    type: object
+  response.Response:
     description: 统一 API 响应格式
     properties:
       code:
@@ -87,6 +283,22 @@ definitions:
         example: 1704067200
         type: integer
     type: object
+  service.TokenPair:
+    description: 双 Token 响应（Access Token + Refresh Token）
+    properties:
+      access_token:
+        description: Access Token
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      expires_in:
+        description: Access Token 过期时间（秒）
+        example: 1800
+        type: integer
+      refresh_token:
+        description: Refresh Token
+        example: a1b2c3d4e5f6...
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -101,6 +313,435 @@ info:
   title: My-Gin API
   version: "1.0"
 paths:
+  /api/v1/admin/roles:
+    get:
+      consumes:
+      - application/json
+      description: 获取所有角色列表
+      parameters:
+      - description: 状态筛选
+        in: query
+        name: status
+        type: integer
+      - description: 编码筛选
+        in: query
+        name: code
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/resp.RoleResp'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 获取角色列表
+      tags:
+      - 权限管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新角色
+      parameters:
+      - description: 创建角色请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/req.CreateRoleReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/resp.RoleResp'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 创建角色
+      tags:
+      - 权限管理
+  /api/v1/admin/roles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除角色（内置角色不可删除）
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 删除角色
+      tags:
+      - 权限管理
+    get:
+      consumes:
+      - application/json
+      description: 获取角色详细信息
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/resp.RoleResp'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 获取角色详情
+      tags:
+      - 权限管理
+    put:
+      consumes:
+      - application/json
+      description: 更新角色信息
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新角色请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/req.UpdateRoleReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新角色
+      tags:
+      - 权限管理
+  /api/v1/admin/roles/{id}/permissions:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定角色的权限
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 资源路径
+        in: query
+        name: resource
+        required: true
+        type: string
+      - description: 操作
+        in: query
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 删除角色权限
+      tags:
+      - 权限管理
+    get:
+      consumes:
+      - application/json
+      description: 获取指定角色的所有权限
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/resp.PermissionResp'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 获取角色权限列表
+      tags:
+      - 权限管理
+    post:
+      consumes:
+      - application/json
+      description: 为指定角色添加权限
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 添加权限请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/req.AddPermissionReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 为角色添加权限
+      tags:
+      - 权限管理
+  /api/v1/admin/unlock-account:
+    post:
+      description: 管理员解锁被锁定的用户账号
+      parameters:
+      - description: 用户UID
+        in: query
+        name: uid
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 解锁用户账号
+      tags:
+      - 安全管理
+  /api/v1/admin/users/{id}/roles:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定用户的所有角色
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/resp.RoleResp'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 获取用户角色列表
+      tags:
+      - 权限管理
+    post:
+      consumes:
+      - application/json
+      description: 为指定用户分配角色
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 分配角色请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/req.AssignRoleReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 分配角色给用户
+      tags:
+      - 权限管理
+  /api/v1/admin/users/{id}/roles/{roleId}:
+    delete:
+      consumes:
+      - application/json
+      description: 移除用户的指定角色
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 角色ID
+        in: path
+        name: role_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: 移除用户角色
+      tags:
+      - 权限管理
+  /api/v1/captcha:
+    get:
+      description: 生成图形验证码
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/resp.CaptchaResp'
+              type: object
+      summary: 获取验证码
+      tags:
+      - 验证码
+  /api/v1/login:
+    post:
+      consumes:
+      - application/json
+      description: 使用手机号和密码登录
+      parameters:
+      - description: 登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/req.LoginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/resp.LoginResp'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 用户登录
+      tags:
+      - 认证
   /api/v1/logout:
     post:
       consumes:
@@ -112,32 +753,17 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_req.RefreshTokenReq'
+          $ref: '#/definitions/req.RefreshTokenReq'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_pkg_response.Response'
+            $ref: '#/definitions/response.Response'
       security:
       - BearerAuth: []
       summary: 用户登出
-      tags:
-      - 认证
-  /api/v1/logout/all:
-    post:
-      description: 删除用户的所有 Refresh Token 并将当前 Access Token 加入黑名单
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_pkg_response.Response'
-      security:
-      - BearerAuth: []
-      summary: 登出所有设备
       tags:
       - 认证
   /api/v1/refresh:
@@ -151,7 +777,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_req.RefreshTokenReq'
+          $ref: '#/definitions/req.RefreshTokenReq'
       produces:
       - application/json
       responses:
@@ -159,20 +785,51 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_pkg_response.Response'
+            - $ref: '#/definitions/response.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_service.TokenPair'
+                  $ref: '#/definitions/service.TokenPair'
               type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_pkg_response.Response'
+            $ref: '#/definitions/response.Response'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_pkg_response.Response'
+            $ref: '#/definitions/response.Response'
       summary: 刷新 Access Token
+      tags:
+      - 认证
+  /api/v1/register:
+    post:
+      consumes:
+      - application/json
+      description: 使用手机号、用户名和密码注册新用户
+      parameters:
+      - description: 注册请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/req.RegisterReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/resp.RegisterResp'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 用户注册
       tags:
       - 认证
   /health:
@@ -186,7 +843,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_resp.CheckResponse'
+            $ref: '#/definitions/resp.CheckResponse'
       summary: 健康检查
       tags:
       - 健康
@@ -201,11 +858,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_resp.CheckResponse'
+            $ref: '#/definitions/resp.CheckResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_resp.CheckResponse'
+            $ref: '#/definitions/resp.CheckResponse'
       summary: 存活检查
       tags:
       - 健康
@@ -220,11 +877,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_resp.ReadyResponse'
+            $ref: '#/definitions/resp.ReadyResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/github_com_xiaochangtongxue_my-gin_internal_dto_resp.ReadyResponse'
+            $ref: '#/definitions/resp.ReadyResponse'
       summary: 就绪检查
       tags:
       - 健康

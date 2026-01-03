@@ -74,12 +74,26 @@ type Cache interface {
 	ZAdd(ctx context.Context, key string, members ...*ZMember) error
 	// ZRem 有序集合移除成员
 	ZRem(ctx context.Context, key string, members ...interface{}) error
-	// ZRange 有序集合按分数范围获取成员
+	// ZCard 有序集合获取元素数量
+	ZCard(ctx context.Context, key string) (int64, error)
+	// ZRemRangeByScore 有序集合按分数范围删除
+	ZRemRangeByScore(ctx context.Context, key string, min, max float64) (int64, error)
+	// ZRange 有序集合按索引范围获取成员
 	ZRange(ctx context.Context, key string, start, stop int64) ([]string, error)
 	// ZRangeByScore 有序集合按分数范围获取成员
 	ZRangeByScore(ctx context.Context, key string, min, max float64) ([]string, error)
 	// ZIncrBy 有序集合成员分数增加
 	ZIncrBy(ctx context.Context, key string, increment float64, member string) (float64, error)
+
+	// HMGet 哈希表批量获取字段
+	HMGet(ctx context.Context, key string, fields ...string) ([]interface{}, error)
+	// HMSet 哈希表批量设置字段
+	HMSet(ctx context.Context, key string, values map[string]interface{}) error
+
+	// Eval 执行 Lua 脚本
+	Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error)
+	// EvalSHA 执行已缓存的 Lua 脚本（通过 SHA）
+	EvalSHA(ctx context.Context, sha string, keys []string, args ...interface{}) (interface{}, error)
 
 	// Close 关闭连接
 	Close() error

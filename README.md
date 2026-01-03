@@ -60,6 +60,26 @@ my-gin/
 
 配置文件位于 `configs/config.yaml`，支持环境变量覆盖（前缀 `APP_`）。
 
+### 环境变量
+
+| 变量名 | 说明 | 示例值 | 必填 |
+|--------|------|--------|------|
+| `APP_JWT_SECRET` | JWT 签名密钥（至少32位） | `your-256-bit-secret-key-here` | **是** |
+
+### 启动示例
+
+```bash
+# 设置 JWT 密钥后启动
+export APP_JWT_SECRET="your-256-bit-secret-key-here"
+go run cmd/server/main.go
+
+# Windows PowerShell
+$env:APP_JWT_SECRET="your-256-bit-secret-key-here"
+go run cmd/server/main.go
+```
+
+**重要**: JWT 密钥必须通过环境变量设置，切勿写入配置文件或提交到代码仓库。
+
 ## 开发进度
 
 - [x] 阶段 1：基础设施层

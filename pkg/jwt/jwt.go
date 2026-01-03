@@ -18,7 +18,7 @@ var (
 
 // Claims JWT 声明结构
 type Claims struct {
-	UserID   uint   `json:"user_id"`  // 用户 ID
+	UID      uint64 `json:"uid"`      // 对外用户ID
 	Username string `json:"username"` // 用户名
 	jwt.RegisteredClaims
 }
@@ -47,10 +47,10 @@ func NewManager(cfg Config) *Manager {
 }
 
 // GenerateToken 生成 Token
-func (m *Manager) GenerateToken(userID uint, username string) (string, error) {
+func (m *Manager) GenerateToken(uid uint64, username string) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID:   userID,
+		UID:      uid,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.expireTime)),
@@ -62,6 +62,11 @@ func (m *Manager) GenerateToken(userID uint, username string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(m.secret)
+}
+
+// GenerateTokenByID 生成 Token（兼容旧代码，使用内部ID）
+func (m *Manager) GenerateTokenByID(userID uint, username string) (string, error) {
+	return m.GenerateToken(uint64(userID), username)
 }
 
 // ParseToken 解析 Token
@@ -120,7 +125,7 @@ func GenerateToken(userID uint, username string) (string, error) {
 	if defaultManager == nil {
 		return "", ErrTokenInvalid
 	}
-	return defaultManager.GenerateToken(userID, username)
+	return defaultManager.GenerateToken(uint64(userID), username)
 }
 
 // ParseToken 解析 Token（便捷方法）

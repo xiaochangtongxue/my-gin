@@ -10,11 +10,11 @@ import (
 // Response 标准响应结构
 // @description 统一 API 响应格式
 type Response struct {
-	Code      int         `json:"code" example:"0"`                        // 业务状态码
-	Message   string      `json:"message" example:"success"`               // 响应消息
-	Data      interface{} `json:"data,omitempty"`                          // 响应数据
-	Timestamp int64       `json:"timestamp" example:"1704067200"`          // 时间戳
-	RequestID string      `json:"request_id,omitempty" example:"abc123"`  // 请求ID
+	Code      int         `json:"code" example:"0"`                      // 业务状态码
+	Message   string      `json:"message" example:"success"`             // 响应消息
+	Data      interface{} `json:"data,omitempty"`                        // 响应数据
+	Timestamp int64       `json:"timestamp" example:"1704067200"`        // 时间戳
+	RequestID string      `json:"request_id,omitempty" example:"abc123"` // 请求ID
 }
 
 // PageData 分页数据结构
@@ -124,6 +124,11 @@ func ServerError(c *gin.Context, message string) {
 	Fail(c, CodeServerError, message)
 }
 
+// RateLimitError 限流错误响应
+func RateLimitError(c *gin.Context) {
+	Fail(c, CodeRateLimitExceeded, GetMessage(CodeRateLimitExceeded))
+}
+
 // getRequestID 获取请求ID
 func getRequestID(c *gin.Context) string {
 	if requestID, exists := c.Get("RequestID"); exists {
@@ -139,14 +144,18 @@ func getStatusCode(code int) int {
 	switch code {
 	case CodeSuccess:
 		return http.StatusOK
-	case CodeInvalidParam:
+	case CodeInvalidParam, CodeCaptchaError:
 		return http.StatusBadRequest
-	case CodeUnauthorized, CodeTokenExpired, CodeTokenInvalid:
+	case CodeUnauthorized, CodeTokenExpired, CodeTokenInvalid, CodePasswordError:
 		return http.StatusUnauthorized
-	case CodeForbidden:
+	case CodeForbidden, CodeAccountLocked, CodePermissionDenied:
 		return http.StatusForbidden
 	case CodeNotFound:
 		return http.StatusNotFound
+	case CodeRateLimitExceeded:
+		return http.StatusTooManyRequests
+	case CodeCaptchaRequired:
+		return http.StatusAccepted // 202，要求客户端完成额外操作（验证码）
 	default:
 		return http.StatusInternalServerError
 	}

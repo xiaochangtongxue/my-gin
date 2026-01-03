@@ -14,9 +14,12 @@ import (
 	"github.com/xiaochangtongxue/my-gin/internal/repository"
 	"github.com/xiaochangtongxue/my-gin/internal/service"
 	"github.com/xiaochangtongxue/my-gin/pkg/cache"
+	"github.com/xiaochangtongxue/my-gin/pkg/captcha"
 	"github.com/xiaochangtongxue/my-gin/pkg/config"
 	"github.com/xiaochangtongxue/my-gin/pkg/database"
 	"github.com/xiaochangtongxue/my-gin/pkg/jwt"
+	"github.com/xiaochangtongxue/my-gin/pkg/notify"
+	"github.com/xiaochangtongxue/my-gin/pkg/permission"
 	"gorm.io/gorm"
 )
 
@@ -45,17 +48,36 @@ func InitializeApp(configFile2 string) (*App, error) {
 	manager := ProvideJWTManager(config)
 	engine := ProvideGinEngine(config, manager, cache)
 	refreshTokenRepository := ProvideRefreshTokenRepository(db)
-	authService := ProvideAuthService(refreshTokenRepository, cache, manager, config)
+	userRepository := ProvideUserRepository(db)
+	securityService := ProvideSecurityService(cache, config)
+	captcha := ProvideCaptcha(config, cache)
+	notifier := ProvideNotifier()
+	authService := ProvideAuthService(refreshTokenRepository, cache, manager, config, userRepository, securityService, captcha, notifier)
 	authHandler := ProvideAuthHandler(authService)
+	captchaHandler := ProvideCaptchaHandler(captcha)
+	securityHandler := ProvideSecurityHandler(securityService)
 	healthHandler := ProvideHealthHandler(db, cache)
+	roleRepository := ProvideRoleRepository(db)
+	userRoleRepository := ProvideUserRoleRepository(db)
+	permissionChecker, err := ProvidePermissionChecker(config, db)
+	if err != nil {
+		return nil, err
+	}
+	permissionService := ProvidePermissionService(db, roleRepository, userRoleRepository, permissionChecker)
+	permissionHandler := ProvidePermissionHandler(permissionService)
 	app := &App{
-		Config:        config,
-		DB:            db,
-		Cache:         cache,
-		JWTMgr:        manager,
-		Engine:        engine,
-		AuthHandler:   authHandler,
-		HealthHandler: healthHandler,
+		Config:            config,
+		DB:                db,
+		Cache:             cache,
+		JWTMgr:            manager,
+		Engine:            engine,
+		AuthHandler:       authHandler,
+		CaptchaHandler:    captchaHandler,
+		SecurityHandler:   securityHandler,
+		HealthHandler:     healthHandler,
+		PermissionHandler: permissionHandler,
+		PermissionChecker: permissionChecker,
+		UserRoleRepo:      userRoleRepository,
 	}
 	return app, nil
 }
@@ -103,27 +125,102 @@ func ProvideRefreshTokenRepository(db *gorm.DB) repository.RefreshTokenRepositor
 	return repository.NewRefreshTokenRepository(db)
 }
 
+// ProvideUserRepository 提供用户仓储
+func ProvideUserRepository(db *gorm.DB) repository.UserRepository {
+	return repository.NewUserRepository(db)
+}
+
+// ProvideRoleRepository 提供角色仓储
+func ProvideRoleRepository(db *gorm.DB) repository.RoleRepository {
+	return repository.NewRoleRepository(db)
+}
+
+// ProvideUserRoleRepository 提供用户角色仓储
+func ProvideUserRoleRepository(db *gorm.DB) repository.UserRoleRepository {
+	return repository.NewUserRoleRepository(db)
+}
+
+// ProvideNotifier 提供通知器（使用 NoopNotifier）
+func ProvideNotifier() notify.Notifier {
+	return notify.NewNoopNotifier()
+}
+
+// ProvideCaptcha 提供验证码
+func ProvideCaptcha(cfg *config.Config, cache2 cache.Cache) *captcha.Captcha {
+	return captcha.New(captcha.Config{
+		Length: cfg.Captcha.Length,
+		Width:  cfg.Captcha.Width,
+		Height: cfg.Captcha.Height,
+		Expire: cfg.Captcha.Expire,
+	}, cache2)
+}
+
+// ProvidePermissionChecker 提供权限检查器
+func ProvidePermissionChecker(cfg *config.Config, db *gorm.DB) (permission.PermissionChecker, error) {
+	return permission.NewChecker(cfg, db)
+}
+
 // ProvideAuthService 提供认证服务
 func ProvideAuthService(
 	rtRepo repository.RefreshTokenRepository,
 	redisCache cache.Cache,
 	jwtMgr *jwt.Manager,
 	cfg *config.Config,
-) *service.AuthService {
+	userRepo repository.UserRepository,
+	securitySvc service.SecurityService, captcha2 *captcha.Captcha, notify2 notify.Notifier,
+
+) service.AuthService {
 	return service.NewAuthService(rtRepo, redisCache, jwtMgr, service.Config{
 		AccessTokenExpire:  cfg.JWT.ExpireTime,
 		RefreshTokenExpire: cfg.JWT.RefreshExpireTime,
+	}, userRepo, securitySvc, captcha2, notify2, cfg.Password.BcryptCost)
+}
+
+// ProvideSecurityService 提供安全服务
+func ProvideSecurityService(cache2 cache.Cache, cfg *config.Config) service.SecurityService {
+	return service.NewSecurityService(cache2, service.SecurityConfig{
+		MaxAttempts:       5,
+		LockDuration:      30 * 60,
+		Window:            15 * 60,
+		BlacklistDuration: 60 * 60,
 	})
 }
 
+// ProvidePermissionService 提供权限服务
+func ProvidePermissionService(
+	db *gorm.DB,
+	roleRepo repository.RoleRepository,
+	userRoleRepo repository.UserRoleRepository,
+	checker permission.PermissionChecker,
+) service.PermissionService {
+
+	policyMgr := checker.(permission.PolicyManager)
+	return service.NewPermissionService(db, roleRepo, userRoleRepo, policyMgr)
+}
+
 // ProvideAuthHandler 提供认证处理器
-func ProvideAuthHandler(authSvc *service.AuthService) *handler.AuthHandler {
+func ProvideAuthHandler(authSvc service.AuthService) *handler.AuthHandler {
 	return handler.NewAuthHandler(authSvc)
+}
+
+// ProvideCaptchaHandler 提供验证码处理器
+func ProvideCaptchaHandler(captcha2 *captcha.Captcha) *handler.CaptchaHandler {
+	return handler.NewCaptchaHandler(captcha2)
+}
+
+// ProvideSecurityHandler 提供安全处理器
+func ProvideSecurityHandler(securitySvc service.SecurityService) *handler.SecurityHandler {
+	return handler.NewSecurityHandler(securitySvc)
 }
 
 // ProvideHealthHandler 提供健康检查处理器
 func ProvideHealthHandler(db *gorm.DB, cache2 cache.Cache) *handler.HealthHandler {
 	return handler.NewHealthHandler(db, cache2)
+}
+
+// ProvidePermissionHandler 提供权限处理器
+func ProvidePermissionHandler(permissionSvc service.PermissionService) *handler.PermissionHandler {
+	return handler.NewPermissionHandler(permissionSvc)
 }
 
 // ProvideGinEngine 提供 Gin 引擎
@@ -140,9 +237,11 @@ func ProvideGinEngine(cfg *config.Config, jwtMgr *jwt.Manager, redisCache cache.
 		EnableCSRF:      cfg.Middleware.CSRF.Enable,
 		EnableAuth:      true,
 		EnableMetrics:   cfg.Middleware.Metrics.Enable,
+		EnableRateLimit: cfg.Middleware.RateLimit.Enable,
 		AuthSkipPaths:   cfg.Middleware.Auth.SkipPaths,
 		AuthJWTMgr:      jwtMgr,
 		AuthCache:       redisCache,
+		RateLimitCache:  redisCache,
 	})
 
 	return engine
@@ -154,22 +253,33 @@ var infraSet = wire.NewSet(
 	ProvideDB,
 	ProvideRedisCache,
 	ProvideJWTManager,
+	ProvideNotifier,
+	ProvideCaptcha,
+	ProvidePermissionChecker,
 )
 
 // repoSet Repository ProviderSet
 var repoSet = wire.NewSet(
 	ProvideRefreshTokenRepository,
+	ProvideUserRepository,
+	ProvideRoleRepository,
+	ProvideUserRoleRepository,
 )
 
 // serviceSet Service ProviderSet
 var serviceSet = wire.NewSet(
 	ProvideAuthService,
+	ProvideSecurityService,
+	ProvidePermissionService,
 )
 
 // handlerSet Handler ProviderSet
 var handlerSet = wire.NewSet(
 	ProvideAuthHandler,
+	ProvideCaptchaHandler,
+	ProvideSecurityHandler,
 	ProvideHealthHandler,
+	ProvidePermissionHandler,
 )
 
 // engineSet Gin Engine ProviderSet
@@ -179,11 +289,16 @@ var engineSet = wire.NewSet(
 
 // App 应用程序依赖容器
 type App struct {
-	Config        *config.Config
-	DB            *gorm.DB
-	Cache         cache.Cache
-	JWTMgr        *jwt.Manager
-	Engine        *gin.Engine
-	AuthHandler   *handler.AuthHandler
-	HealthHandler *handler.HealthHandler
+	Config            *config.Config
+	DB                *gorm.DB
+	Cache             cache.Cache
+	JWTMgr            *jwt.Manager
+	Engine            *gin.Engine
+	AuthHandler       *handler.AuthHandler
+	CaptchaHandler    *handler.CaptchaHandler
+	SecurityHandler   *handler.SecurityHandler
+	HealthHandler     *handler.HealthHandler
+	PermissionHandler *handler.PermissionHandler
+	PermissionChecker permission.PermissionChecker
+	UserRoleRepo      repository.UserRoleRepository
 }
