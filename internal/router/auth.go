@@ -37,6 +37,6 @@ func RegisterSecurityRoutes(r *gin.Engine, securityHandler *handler.SecurityHand
 	{
 		// 加载用户角色中间件（在权限检查前执行）
 		admin.Use(middleware.LoadUserRoles(userRoleRepo))
-		admin.POST("/unlock-account",middleware.PermissionRequired(checker, "/api/v1/admin/roles", permission.ActionCreate),, securityHandler.UnlockAccount)
+		admin.POST("/unlock-account", middleware.PermissionRequired(checker, "/api/v1/admin/roles", permission.ActionCreate), securityHandler.UnlockAccount)
 	}
 }
