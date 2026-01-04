@@ -14,6 +14,7 @@ import (
 
 	_ "github.com/xiaochangtongxue/my-gin/docs" // Swagger 文档
 	"github.com/xiaochangtongxue/my-gin/internal/router"
+	"github.com/xiaochangtongxue/my-gin/pkg/cache"
 	"github.com/xiaochangtongxue/my-gin/pkg/database"
 	"github.com/xiaochangtongxue/my-gin/pkg/logger"
 	"github.com/xiaochangtongxue/my-gin/pkg/validator"
@@ -103,7 +104,9 @@ func main() {
 
 	logger.Info("服务正在关闭...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// 优雅关闭，等待现有请求完成（最多30秒）
+	// K8s terminationGracePeriodSeconds 应该大于等于这个值
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
@@ -113,6 +116,11 @@ func main() {
 	// 关闭数据库连接
 	if err := database.Close(); err != nil {
 		logger.Error("数据库关闭失败", zap.Error(err))
+	}
+
+	// 关闭 Redis 连接
+	if err := cache.CloseRedis(); err != nil {
+		logger.Error("Redis关闭失败", zap.Error(err))
 	}
 
 	logger.Info("服务已关闭")

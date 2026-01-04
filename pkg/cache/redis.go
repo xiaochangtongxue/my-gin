@@ -279,3 +279,11 @@ func (r *RedisCache) Close() error {
 func (r *RedisCache) Ping(ctx context.Context) error {
 	return r.client.Ping(ctx).Err()
 }
+
+// CloseRedis 关闭全局 Redis 连接
+func CloseRedis() error {
+	if redisClient != nil {
+		return redisClient.Close()
+	}
+	return nil
+}

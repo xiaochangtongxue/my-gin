@@ -1,0 +1,64 @@
+# Git 相关
+.git
+.gitignore
+.github
+
+# 文档（markdown 文件）
+*.md
+README.md
+CHANGELOG.md
+LICENSE
+# 排除 docs 目录中的 markdown 文档，但保留 Swagger 生成的代码
+docs/*.md
+
+# 测试和示例
+test/
+examples/
+*_test.go
+
+# 第三方工具
+third_party/
+tools/
+
+# CI/CD
+.gitlab/
+.github/
+
+# 部署配置（会被单独处理）
+deployments/
+
+# 构建产物
+bin/
+build/
+*.exe
+*.so
+*.dylib
+
+# 依赖缓存
+vendor/
+
+# 环境变量文件（绝不能进入镜像）
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE 配置
+.vscode/
+.idea/
+*.iml
+
+# 覆盖率报告
+coverage.out
+coverage.html

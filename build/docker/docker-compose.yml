@@ -1,0 +1,37 @@
+# Docker Compose 配置文件
+# 连接外部已部署的 MySQL/Redis（dev-network）
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: build/docker/Dockerfile
+    container_name: my-gin-app
+    restart: unless-stopped
+    networks:
+      - dev-network  # 加入到 MySQL/Redis 所在的网络
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_DATABASE_HOST: ${APP_DATABASE_HOST:-mysql-dev}
+      APP_DATABASE_PORT: ${APP_DATABASE_PORT:-3306}
+      APP_DATABASE_USERNAME: ${APP_DATABASE_USERNAME:-root}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:-123456}
+      APP_DATABASE_NAME: ${APP_DATABASE_NAME:-my_app_db}
+      APP_REDIS_HOST: ${APP_REDIS_HOST:-redis-dev:6379}
+      APP_REDIS_PASSWORD: ${APP_REDIS_PASSWORD:-}
+      APP_SERVER_MODE: ${APP_SERVER_MODE:-debug}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+# 使用外部已存在的网络
+networks:
+  dev-network:
+    external: true
+    name: dev-network

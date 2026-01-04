@@ -2,23 +2,20 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/xiaochangtongxue/my-gin/pkg/captcha"
-	"github.com/xiaochangtongxue/my-gin/pkg/notify"
-	"github.com/xiaochangtongxue/my-gin/pkg/utils"
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 	"strconv"
 	"time"
 
 	"github.com/xiaochangtongxue/my-gin/internal/model"
 	"github.com/xiaochangtongxue/my-gin/internal/repository"
 	"github.com/xiaochangtongxue/my-gin/pkg/cache"
+	"github.com/xiaochangtongxue/my-gin/pkg/captcha"
+	"github.com/xiaochangtongxue/my-gin/pkg/crypto"
 	"github.com/xiaochangtongxue/my-gin/pkg/jwt"
+	"github.com/xiaochangtongxue/my-gin/pkg/notify"
+	"github.com/xiaochangtongxue/my-gin/pkg/utils"
+	"gorm.io/gorm"
 )
 
 const (
@@ -102,7 +99,7 @@ func NewAuthService(
 	bcryptCost int,
 ) *authService {
 	if bcryptCost == 0 {
-		bcryptCost = bcrypt.DefaultCost
+		bcryptCost = crypto.DefaultCost
 	}
 	return &authService{
 		rtRepo:      rtRepo,
@@ -137,7 +134,7 @@ func (s *authService) Register(ctx context.Context, mobile, username, password s
 	}
 
 	// 3. 密码加密
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	hash, err := crypto.HashPassword(password, s.bcryptCost)
 	if err != nil {
 		return nil, fmt.Errorf("密码加密失败: %w", err)
 	}
@@ -216,7 +213,7 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 	}
 
 	// 5. 验证密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if !crypto.VerifyPassword(user.Password, password) {
 		// 密码错误：记录失败
 		_ = s.securitySvc.RecordFailure(ctx, ip, uid)
 		return nil, errors.New("用户名或密码错误")
@@ -232,7 +229,7 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 	}
 
 	// 8. 生成RefreshToken
-	refreshToken, err := generateRefreshToken()
+	refreshToken, err := crypto.RandomString(64)
 	if err != nil {
 		return nil, fmt.Errorf("生成刷新Token失败: %w", err)
 	}
@@ -277,7 +274,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*T
 	}
 
 	// 4. 生成新的 Refresh Token（滚动更新）
-	newRefreshToken, err := generateRefreshToken()
+	newRefreshToken, err := crypto.RandomString(64)
 	if err != nil {
 		return nil, err
 	}
@@ -299,15 +296,6 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		RefreshToken: newRefreshToken,
 		ExpiresIn:    int64(s.jwtMgr.GetExpireTime().Seconds()),
 	}, nil
-}
-
-// generateRefreshToken 生成随机 Refresh Token
-func generateRefreshToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }
 
 // LogoutWithAccessToken 登出（删除 RT 并将 AT 加入黑名单）
@@ -332,32 +320,13 @@ func (s *authService) addTokenToBlacklist(ctx context.Context, token string, cla
 	}
 
 	// 计算 Token 的剩余有效时间
-	ttl := getTokenTTL(claims)
+	ttl := utils.RemainingSeconds(claims.ExpiresAt.Time)
 	if ttl <= 0 {
 		return nil // Token 已过期，无需添加到黑名单
 	}
 
 	// 使用 Token 的哈希值作为 key
-	tokenKey := getTokenKey(token)
+	tokenKey := TokenBlacklistKeyPrefix + crypto.SHA256(token)
 
 	return s.cache.Set(ctx, tokenKey, "1", time.Duration(ttl)*time.Second)
-}
-
-// getTokenKey 获取 Token 的唯一标识（SHA256 哈希）
-func getTokenKey(token string) string {
-	hash := sha256.Sum256([]byte(token))
-	return TokenBlacklistKeyPrefix + hex.EncodeToString(hash[:])
-}
-
-// getTokenTTL 计算 Token 的剩余有效时间（秒）
-func getTokenTTL(claims *jwt.Claims) int64 {
-	if claims.ExpiresAt == nil {
-		return 0
-	}
-	expiresAt := claims.ExpiresAt.Time
-	remaining := expiresAt.Unix() - time.Now().Unix()
-	if remaining <= 0 {
-		return 0
-	}
-	return remaining
 }

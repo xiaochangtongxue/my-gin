@@ -1,0 +1,76 @@
+# Kubernetes Ingress 配置
+# 配置外部访问
+#
+# 前置条件：
+#   1. 已安装 Ingress Controller（如 nginx-ingress）
+#   2. 已配置 DNS 或本地 hosts
+#
+# 创建方式：
+#   kubectl apply -f deployments/kubernetes/ingress.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-gin-ingress
+  namespace: default
+  labels:
+    app: my-gin
+  annotations:
+    # Nginx Ingress Controller 注解
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+    # 限流配置（可选）
+    # nginx.ingress.kubernetes.io/limit-rps: "100"
+    # nginx.ingress.kubernetes.io/limit-burst-multiplier: "2"
+
+    # CORS 配置（可选）
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+
+    # 白名单 IP（可选）
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+spec:
+  ingressClassName: nginx
+
+  # TLS 配置
+  tls:
+  - hosts:
+    - api.example.com
+    secretName: my-gin-tls  # 需预先创建 TLS Secret
+
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-gin-service
+            port:
+              number: 80
+
+---
+# TLS Secret 创建示例（需要真实的证书文件）
+# kubectl create secret tls my-gin-tls \
+#   --cert=path/to/cert.crt \
+#   --key=path/to/cert.key
+
+# 或者使用 cert-manager 自动管理 Let's Encrypt 证书
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-prod
+# spec:
+#   acme:
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     email: your-email@example.com
+#     privateKeySecretRef:
+#       name: letsencrypt-prod
+#     solvers:
+#     - http01:
+#         ingress:
+#           class: nginx

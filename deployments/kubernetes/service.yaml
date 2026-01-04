@@ -1,0 +1,46 @@
+# Kubernetes Service 配置
+# 暴露应用服务
+#
+# 创建方式：
+#   kubectl apply -f deployments/kubernetes/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-gin-service
+  namespace: default
+  labels:
+    app: my-gin
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+
+  selector:
+    app: my-gin
+
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: http
+    # nodePort: 30080  # 如果 type=NodePort 时使用
+
+---
+# Headless Service（可选，用于 StatefulSet 或需要直接访问 Pod）
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-gin-headless
+  namespace: default
+  labels:
+    app: my-gin
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: my-gin
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: http

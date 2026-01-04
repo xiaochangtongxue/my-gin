@@ -1,14 +1,13 @@
 package middleware
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xiaochangtongxue/my-gin/pkg/config"
+	"github.com/xiaochangtongxue/my-gin/pkg/crypto"
 	"github.com/xiaochangtongxue/my-gin/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -134,14 +133,12 @@ func generateCSRFToken(length int) string {
 	if length <= 0 {
 		length = 32
 	}
-
-	bytes := make([]byte, length/2)
-	if _, err := rand.Read(bytes); err != nil {
+	token, err := crypto.RandomString(length)
+	if err != nil {
 		// 如果随机数生成失败，使用备用方案
 		return generateFallbackToken(length)
 	}
-
-	return hex.EncodeToString(bytes)
+	return token
 }
 
 // generateFallbackToken 生成备用 Token
