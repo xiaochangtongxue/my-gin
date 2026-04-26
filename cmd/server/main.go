@@ -12,8 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
-	_ "github.com/xiaochangtongxue/my-gin/docs" // Swagger 文档
-	"github.com/xiaochangtongxue/my-gin/internal/router"
+	_ "github.com/xiaochangtongxue/my-gin/api" // Swagger 文档
 	"github.com/xiaochangtongxue/my-gin/pkg/cache"
 	"github.com/xiaochangtongxue/my-gin/pkg/database"
 	"github.com/xiaochangtongxue/my-gin/pkg/logger"
@@ -76,7 +75,7 @@ func main() {
 	)
 
 	// 注册路由
-	setupRoutes(app)
+	app.RegisterRoutes()
 
 	// 创建HTTP服务器
 	srv := &http.Server{
@@ -87,7 +86,9 @@ func main() {
 	}
 
 	// 数据库迁移
-	database.Up()
+	if err := database.Up(); err != nil {
+		logger.Fatal("数据库迁移失败", zap.Error(err))
+	}
 
 	// 启动服务器
 	go func() {
@@ -124,17 +125,4 @@ func main() {
 	}
 
 	logger.Info("服务已关闭")
-}
-
-// setupRoutes 配置路由
-func setupRoutes(app *App) {
-	engine := app.Engine
-
-	// 注册各模块路由
-	router.RegisterSwaggerRoutes(engine)                                                                    // Swagger 文档
-	router.RegisterHealthRoutes(engine, app.HealthHandler)                                                  // 健康检查
-	router.RegisterMetricsRoutes(engine)                                                                    // Prometheus Metrics
-	router.RegisterAuthRoutes(engine, app.AuthHandler, app.CaptchaHandler)                                  // 认证路由
-	router.RegisterSecurityRoutes(engine, app.SecurityHandler, app.PermissionChecker, app.UserRoleRepo)     // 安全管理路由
-	router.RegisterPermissionRoutes(engine, app.PermissionHandler, app.PermissionChecker, app.UserRoleRepo) // 权限管理路由
 }

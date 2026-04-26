@@ -37,6 +37,7 @@ var codeMessages = map[int]string{
 	CodeRedisError:        "缓存操作失败",
 	CodeTokenExpired:      "登录已过期，请重新登录",
 	CodeTokenInvalid:      "登录状态无效",
+	CodeInternalError:     "内部错误",
 	CodeRateLimitExceeded: "请求过于频繁，请稍后再试",
 	CodeCaptchaRequired:   "请完成验证码验证",
 	CodeCaptchaError:      "验证码错误或已过期",

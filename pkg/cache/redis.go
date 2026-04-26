@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -17,8 +19,9 @@ var (
 
 // InitRedis 初始化Redis
 func InitRedis(cfg *config.RedisConfig) error {
+	addr := redisAddr(cfg)
 	redisClient = redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Addr:         addr,
 		Password:     cfg.Password,
 		DB:           cfg.DB,
 		PoolSize:     cfg.PoolSize,
@@ -34,6 +37,13 @@ func InitRedis(cfg *config.RedisConfig) error {
 	}
 
 	return nil
+}
+
+func redisAddr(cfg *config.RedisConfig) string {
+	if _, _, err := net.SplitHostPort(cfg.Host); err == nil {
+		return cfg.Host
+	}
+	return net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 }
 
 // GetRedis 获取Redis客户端

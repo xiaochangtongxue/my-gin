@@ -3,13 +3,18 @@ package permission
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"strings"
 
 	"github.com/casbin/casbin/v2"
+	casbinmodel "github.com/casbin/casbin/v2/model"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"gorm.io/gorm"
 )
+
+//go:embed model.conf
+var defaultModel string
 
 // RBACChecker RBAC 权限检查器
 type RBACChecker struct {
@@ -22,10 +27,6 @@ var _ PolicyManager = (*RBACChecker)(nil)
 
 // NewRBACChecker 创建 RBAC 检查器
 func NewRBACChecker(db *gorm.DB, modelFile string) (*RBACChecker, error) {
-	if modelFile == "" {
-		modelFile = "pkg/permission/model.conf"
-	}
-
 	// 禁用 Casbin 自动建表，表结构由迁移文件管理（包含时间戳字段）
 	gormadapter.TurnOffAutoMigrate(db)
 
@@ -35,7 +36,16 @@ func NewRBACChecker(db *gorm.DB, modelFile string) (*RBACChecker, error) {
 		return nil, fmt.Errorf("创建 Casbin 适配器失败: %w", err)
 	}
 
-	enforcer, err := casbin.NewEnforcer(modelFile, adapter)
+	var enforcer *casbin.Enforcer
+	if modelFile == "" {
+		model, modelErr := casbinmodel.NewModelFromString(defaultModel)
+		if modelErr != nil {
+			return nil, fmt.Errorf("加载内嵌 Casbin 模型失败: %w", modelErr)
+		}
+		enforcer, err = casbin.NewEnforcer(model, adapter)
+	} else {
+		enforcer, err = casbin.NewEnforcer(modelFile, adapter)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("创建 Casbin Enforcer 失败: %w", err)
 	}

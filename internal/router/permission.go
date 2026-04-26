@@ -6,7 +6,7 @@ import (
 	"github.com/xiaochangtongxue/my-gin/internal/handler"
 	"github.com/xiaochangtongxue/my-gin/internal/middleware"
 	"github.com/xiaochangtongxue/my-gin/internal/repository"
-	"github.com/xiaochangtongxue/my-gin/pkg/permission"
+	"github.com/xiaochangtongxue/my-gin/internal/permission"
 )
 
 // RegisterPermissionRoutes 注册权限管理路由

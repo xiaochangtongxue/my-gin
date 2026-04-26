@@ -19,11 +19,6 @@
     "paths": {
         "/api/v1/admin/roles": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "获取所有角色列表",
                 "consumes": [
                     "application/json"
@@ -77,14 +72,14 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "创建新角色",
                 "consumes": [
                     "application/json"
@@ -132,16 +127,16 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            }
-        },
-        "/api/v1/admin/roles/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/api/v1/admin/roles/{id}": {
+            "get": {
                 "description": "获取角色详细信息",
                 "consumes": [
                     "application/json"
@@ -187,14 +182,14 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "更新角色信息",
                 "consumes": [
                     "application/json"
@@ -237,14 +232,14 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "删除角色（内置角色不可删除）",
                 "consumes": [
                     "application/json"
@@ -278,16 +273,16 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            }
-        },
-        "/api/v1/admin/roles/{id}/permissions": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/api/v1/admin/roles/{id}/permissions": {
+            "get": {
                 "description": "获取指定角色的所有权限",
                 "consumes": [
                     "application/json"
@@ -336,14 +331,14 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "为指定角色添加权限",
                 "consumes": [
                     "application/json"
@@ -386,14 +381,14 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "删除指定角色的权限",
                 "consumes": [
                     "application/json"
@@ -441,7 +436,12 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/admin/unlock-account": {
@@ -478,11 +478,6 @@
         },
         "/api/v1/admin/users/{id}/roles": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "获取指定用户的所有角色",
                 "consumes": [
                     "application/json"
@@ -531,14 +526,14 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "为指定用户分配角色",
                 "consumes": [
                     "application/json"
@@ -581,16 +576,16 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
-            }
-        },
-        "/api/v1/admin/users/{id}/roles/{roleId}": {
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/api/v1/admin/users/{id}/roles/{roleId}": {
+            "delete": {
                 "description": "移除用户的指定角色",
                 "consumes": [
                     "application/json"
@@ -631,10 +626,15 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
-        "/api/v1/captcha": {
+        "/api/v1/auth/captcha": {
             "get": {
                 "description": "生成图形验证码",
                 "produces": [
@@ -666,7 +666,7 @@
                 }
             }
         },
-        "/api/v1/login": {
+        "/api/v1/auth/login": {
             "post": {
                 "description": "使用手机号和密码登录",
                 "consumes": [
@@ -718,13 +718,8 @@
                 }
             }
         },
-        "/api/v1/logout": {
+        "/api/v1/auth/logout": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "删除 Refresh Token 并将 Access Token 加入黑名单",
                 "consumes": [
                     "application/json"
@@ -754,10 +749,15 @@
                             "$ref": "#/definitions/response.Response"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
-        "/api/v1/refresh": {
+        "/api/v1/auth/refresh": {
             "post": {
                 "description": "使用 Refresh Token 获取新的 Access Token",
                 "consumes": [
@@ -815,7 +815,7 @@
                 }
             }
         },
-        "/api/v1/register": {
+        "/api/v1/auth/register": {
             "post": {
                 "description": "使用手机号、用户名和密码注册新用户",
                 "consumes": [

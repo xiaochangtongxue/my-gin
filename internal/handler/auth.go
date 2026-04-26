@@ -35,7 +35,7 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 // @Param request body req.RegisterReq true "注册请求"
 // @Success 200 {object} response.Response{data=resp.RegisterResp}
 // @Failure 400 {object} response.Response
-// @Router /api/v1/register [post]
+// @Router /api/v1/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var r req.RegisterReq
 	if err := c.ShouldBindJSON(&r); err != nil {
@@ -51,7 +51,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			zap.String("mobile", r.Mobile),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Param request body req.LoginReq true "登录请求"
 // @Success 200 {object} response.Response{data=resp.LoginResp}
 // @Failure 400 {object} response.Response
-// @Router /api/v1/login [post]
+// @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var r req.LoginReq
 	if err := c.ShouldBindJSON(&r); err != nil {
@@ -96,24 +96,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			zap.String("ip", ip),
 			zap.Error(err),
 		)
-		// 根据错误信息返回不同的错误码
-		msg := err.Error()
-		switch msg {
-		case "用户不存在":
-			response.Fail(c, response.CodeNotFound, msg)
-		case "IP已被封禁，请联系管理员":
-			response.Fail(c, response.CodeForbidden, msg)
-		case "请输入验证码":
-			response.Fail(c, response.CodeCaptchaRequired, msg)
-		case "验证码错误或已过期":
-			response.Fail(c, response.CodeCaptchaError, msg)
-		default:
-			if len(msg) > 5 && msg[:5] == "账号已锁定" {
-				response.Fail(c, response.CodeAccountLocked, msg)
-			} else {
-				response.Fail(c, response.CodePasswordError, msg)
-			}
-		}
+		response.Error(c, err)
 		return
 	}
 
@@ -143,7 +126,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Success 200 {object} response.Response{data=service.TokenPair}
 // @Failure 400 {object} response.Response
 // @Failure 401 {object} response.Response
-// @Router /api/v1/refresh [post]
+// @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req req.RefreshTokenReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -158,7 +141,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 			zap.String("request_id", middleware.GetRequestID(c)),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeTokenInvalid, "Refresh Token 无效或已过期")
+		response.Error(c, err)
 		return
 	}
 
@@ -178,7 +161,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body req.RefreshTokenReq true "登出请求"
 // @Success 200 {object} response.Response
-// @Router /api/v1/logout [post]
+// @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req req.RefreshTokenReq
 	if err := c.ShouldBindJSON(&req); err != nil {

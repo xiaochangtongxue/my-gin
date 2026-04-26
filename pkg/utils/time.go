@@ -23,7 +23,7 @@ func FormatDateTime(t time.Time) string {
 
 // FormatDateTimeString 格式化时间戳为标准格式
 func FormatDateTimeString(timestamp int64) string {
-	return time.Unix(timestamp, 0).Format(DateTimeFormat)
+	return UnixToTime(timestamp).Format(DateTimeFormat)
 }
 
 // FormatDate 格式化日期 YYYY-MM-DD
@@ -58,7 +58,7 @@ func NowUnixMilli() int64 {
 
 // UnixToTime 时间戳转时间
 func UnixToTime(timestamp int64) time.Time {
-	return time.Unix(timestamp, 0)
+	return time.Unix(timestamp, 0).UTC()
 }
 
 // TimeDiff 计算两个时间之间的差值（秒）
@@ -118,7 +118,7 @@ func StartOfWeek(t time.Time) time.Time {
 
 // EndOfWeek 获取一周的结束时间（周日 23:59:59）
 func EndOfWeek(t time.Time) time.Time {
-	return StartOfDay(t.AddDate(0, 0, 7)).Add(-time.Second)
+	return StartOfWeek(t).AddDate(0, 0, 7).Add(-time.Second)
 }
 
 // StartOfMonth 获取一月的开始时间

@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 )
@@ -71,7 +72,6 @@ func (m *MemoryCache) Get(ctx context.Context, key string) (string, error) {
 
 	if item, ok := m.data[key]; ok {
 		if item.isExpired() {
-			delete(m.data, key)
 			return "", nil
 		}
 		if str, ok := item.value.(string); ok {
@@ -117,7 +117,6 @@ func (m *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 
 	if item, ok := m.data[key]; ok {
 		if item.isExpired() {
-			delete(m.data, key)
 			return false, nil
 		}
 		return true, nil
@@ -175,7 +174,6 @@ func (m *MemoryCache) GetBytes(ctx context.Context, key string) ([]byte, error) 
 
 	if item, ok := m.data[key]; ok {
 		if item.isExpired() {
-			delete(m.data, key)
 			return nil, nil
 		}
 		if bytes, ok := item.value.([]byte); ok {
@@ -197,7 +195,6 @@ func (m *MemoryCache) GetObject(ctx context.Context, key string, dest interface{
 
 	if item, ok := m.data[key]; ok {
 		if item.isExpired() {
-			delete(m.data, key)
 			return nil
 		}
 		if bytes, ok := item.value.([]byte); ok {
@@ -592,6 +589,40 @@ func (m *MemoryCache) ZRem(ctx context.Context, key string, members ...interface
 	return nil
 }
 
+// ZCard 获取有序集合元素数量
+func (m *MemoryCache) ZCard(ctx context.Context, key string) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	zKey := "zset:" + key
+	if item, ok := m.data[zKey]; ok && !item.isExpired() {
+		if zset, ok := item.value.(map[string]float64); ok {
+			return int64(len(zset)), nil
+		}
+	}
+	return 0, nil
+}
+
+// ZRemRangeByScore 按分数范围删除有序集合成员
+func (m *MemoryCache) ZRemRangeByScore(ctx context.Context, key string, min, max float64) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	zKey := "zset:" + key
+	var removed int64
+	if item, ok := m.data[zKey]; ok && !item.isExpired() {
+		if zset, ok := item.value.(map[string]float64); ok {
+			for member, score := range zset {
+				if score >= min && score <= max {
+					delete(zset, member)
+					removed++
+				}
+			}
+		}
+	}
+	return removed, nil
+}
+
 // ZRange 有序集合按索引范围获取成员
 func (m *MemoryCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
 	// 内存缓存简化实现，返回所有成员
@@ -654,6 +685,39 @@ func (m *MemoryCache) ZIncrBy(ctx context.Context, key string, increment float64
 		expiration: exp,
 	}
 	return zset[member], nil
+}
+
+// HMGet 哈希表批量获取字段
+func (m *MemoryCache) HMGet(ctx context.Context, key string, fields ...string) ([]interface{}, error) {
+	values := make([]interface{}, len(fields))
+	for i, field := range fields {
+		value, err := m.HGet(ctx, key, field)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = value
+	}
+	return values, nil
+}
+
+// HMSet 哈希表批量设置字段
+func (m *MemoryCache) HMSet(ctx context.Context, key string, values map[string]interface{}) error {
+	for field, value := range values {
+		if err := m.HSet(ctx, key, field, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Eval 执行 Lua 脚本
+func (m *MemoryCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+	return nil, errors.New("memory cache does not support Lua scripts")
+}
+
+// EvalSHA 执行已缓存的 Lua 脚本
+func (m *MemoryCache) EvalSHA(ctx context.Context, sha string, keys []string, args ...interface{}) (interface{}, error) {
+	return nil, errors.New("memory cache does not support Lua scripts")
 }
 
 // Close 关闭缓存

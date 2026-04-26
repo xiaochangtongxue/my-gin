@@ -121,7 +121,10 @@ func Base64URLEncode(data string) string {
 func Base64URLDecode(data string) (string, error) {
 	decoded, err := base64.URLEncoding.DecodeString(data)
 	if err != nil {
-		return "", err
+		decoded, err = base64.RawURLEncoding.DecodeString(data)
+		if err != nil {
+			return "", err
+		}
 	}
 	return string(decoded), nil
 }

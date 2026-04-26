@@ -3,8 +3,7 @@ package service
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	stderrors "errors"
 	"strconv"
 	"time"
 
@@ -13,8 +12,10 @@ import (
 	"github.com/xiaochangtongxue/my-gin/internal/dto/req"
 	"github.com/xiaochangtongxue/my-gin/internal/dto/resp"
 	"github.com/xiaochangtongxue/my-gin/internal/model"
+	"github.com/xiaochangtongxue/my-gin/internal/permission"
 	"github.com/xiaochangtongxue/my-gin/internal/repository"
-	"github.com/xiaochangtongxue/my-gin/pkg/permission"
+	apperrors "github.com/xiaochangtongxue/my-gin/pkg/errors"
+	"github.com/xiaochangtongxue/my-gin/pkg/response"
 )
 
 // PermissionService 权限服务接口
@@ -65,10 +66,10 @@ func (s *permissionService) CreateRole(ctx context.Context, r *req.CreateRoleReq
 	// 检查编码是否已存在
 	exist, err := s.roleRepo.ExistsByCode(ctx, r.Code)
 	if err != nil {
-		return nil, fmt.Errorf("检查角色编码失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "检查角色编码失败")
 	}
 	if exist {
-		return nil, errors.New("角色编码已存在")
+		return nil, apperrors.New(response.CodeInvalidParam, "角色编码已存在")
 	}
 
 	role := &model.Role{
@@ -81,7 +82,7 @@ func (s *permissionService) CreateRole(ctx context.Context, r *req.CreateRoleReq
 	}
 
 	if err := s.roleRepo.Create(ctx, role); err != nil {
-		return nil, fmt.Errorf("创建角色失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "创建角色失败")
 	}
 
 	return s.toRoleResp(role), nil
@@ -91,22 +92,22 @@ func (s *permissionService) CreateRole(ctx context.Context, r *req.CreateRoleReq
 func (s *permissionService) UpdateRole(ctx context.Context, id uint64, r *req.UpdateRoleReq) error {
 	role, err := s.roleRepo.FindByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("角色不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(response.CodeNotFound, "角色不存在")
 		}
-		return fmt.Errorf("查询角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "查询角色失败")
 	}
 
 	// 内置角色不允许修改编码
 	if role.BuiltIn == 1 && role.Code != r.Code {
-		return errors.New("内置角色不允许修改编码")
+		return apperrors.New(response.CodeForbidden, "内置角色不允许修改编码")
 	}
 
 	// 检查新编码是否被其他角色使用
 	if r.Code != role.Code {
 		exist, err := s.roleRepo.ExistsByCode(ctx, r.Code)
 		if err == nil && exist {
-			return errors.New("角色编码已存在")
+			return apperrors.New(response.CodeInvalidParam, "角色编码已存在")
 		}
 	}
 
@@ -120,7 +121,7 @@ func (s *permissionService) UpdateRole(ctx context.Context, id uint64, r *req.Up
 	role.SortOrder = r.SortOrder
 
 	if err := s.roleRepo.Update(ctx, role); err != nil {
-		return fmt.Errorf("更新角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "更新角色失败")
 	}
 
 	return nil
@@ -130,15 +131,15 @@ func (s *permissionService) UpdateRole(ctx context.Context, id uint64, r *req.Up
 func (s *permissionService) DeleteRole(ctx context.Context, id uint64) error {
 	role, err := s.roleRepo.FindByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("角色不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(response.CodeNotFound, "角色不存在")
 		}
-		return fmt.Errorf("查询角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "查询角色失败")
 	}
 
 	// 内置角色不允许删除
 	if role.BuiltIn == 1 {
-		return errors.New("内置角色不允许删除")
+		return apperrors.New(response.CodeForbidden, "内置角色不允许删除")
 	}
 
 	// 使用事务处理
@@ -146,17 +147,17 @@ func (s *permissionService) DeleteRole(ctx context.Context, id uint64) error {
 		// 1. 删除 Casbin 策略
 		roleIDStr := strconv.FormatUint(role.ID, 10)
 		if err := s.policyMgr.RemoveFilteredPolicy(ctx, roleIDStr); err != nil {
-			return fmt.Errorf("删除策略失败: %w", err)
+			return apperrors.Wrap(err, response.CodeDBError, "删除策略失败")
 		}
 
 		// 2. 删除用户角色关联
 		if err := s.userRoleRepo.DeleteByRoleID(ctx, role.ID); err != nil {
-			return fmt.Errorf("删除用户角色关联失败: %w", err)
+			return apperrors.Wrap(err, response.CodeDBError, "删除用户角色关联失败")
 		}
 
 		// 3. 删除角色
 		if err := s.roleRepo.Delete(ctx, role.ID); err != nil {
-			return fmt.Errorf("删除角色失败: %w", err)
+			return apperrors.Wrap(err, response.CodeDBError, "删除角色失败")
 		}
 
 		return nil
@@ -167,10 +168,10 @@ func (s *permissionService) DeleteRole(ctx context.Context, id uint64) error {
 func (s *permissionService) GetRole(ctx context.Context, id uint64) (*resp.RoleResp, error) {
 	role, err := s.roleRepo.FindByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("角色不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(response.CodeNotFound, "角色不存在")
 		}
-		return nil, fmt.Errorf("查询角色失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "查询角色失败")
 	}
 
 	return s.toRoleResp(role), nil
@@ -180,7 +181,7 @@ func (s *permissionService) GetRole(ctx context.Context, id uint64) (*resp.RoleR
 func (s *permissionService) ListRoles(ctx context.Context, r *req.ListRolesReq) ([]*resp.RoleResp, error) {
 	roles, err := s.roleRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("查询角色列表失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "查询角色列表失败")
 	}
 
 	result := make([]*resp.RoleResp, 0, len(roles))
@@ -202,17 +203,17 @@ func (s *permissionService) ListRoles(ctx context.Context, r *req.ListRolesReq) 
 func (s *permissionService) AddPermission(ctx context.Context, roleID uint64, r *req.AddPermissionReq) error {
 	// 检查角色是否存在
 	if _, err := s.roleRepo.FindByID(ctx, roleID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("角色不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(response.CodeNotFound, "角色不存在")
 		}
-		return fmt.Errorf("查询角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "查询角色失败")
 	}
 
 	roleIDStr := strconv.FormatUint(roleID, 10)
 
 	// 检查权限是否已存在
 	if s.policyMgr.HasPolicy(ctx, roleIDStr, r.Resource, r.Action) {
-		return errors.New("权限已存在")
+		return apperrors.New(response.CodeInvalidParam, "权限已存在")
 	}
 
 	// 添加策略
@@ -224,7 +225,7 @@ func (s *permissionService) AddPermission(ctx context.Context, roleID uint64, r 
 		Effect:   "allow",
 	}
 	if err := s.policyMgr.AddPolicy(ctx, policy); err != nil {
-		return fmt.Errorf("添加策略失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "添加策略失败")
 	}
 
 	return nil
@@ -240,7 +241,7 @@ func (s *permissionService) RemovePermission(ctx context.Context, roleID uint64,
 		Action:   action,
 	}
 	if err := s.policyMgr.RemovePolicy(ctx, policy); err != nil {
-		return fmt.Errorf("删除策略失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "删除策略失败")
 	}
 	return nil
 }
@@ -249,16 +250,16 @@ func (s *permissionService) RemovePermission(ctx context.Context, roleID uint64,
 func (s *permissionService) GetRolePermissions(ctx context.Context, roleID uint64) ([]*resp.PermissionResp, error) {
 	// 检查角色是否存在
 	if _, err := s.roleRepo.FindByID(ctx, roleID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("角色不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(response.CodeNotFound, "角色不存在")
 		}
-		return nil, fmt.Errorf("查询角色失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "查询角色失败")
 	}
 
 	roleIDStr := strconv.FormatUint(roleID, 10)
 	policies, err := s.policyMgr.GetPolicies(ctx, &permission.PolicyFilter{Subject: roleIDStr})
 	if err != nil {
-		return nil, fmt.Errorf("获取策略失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "获取策略失败")
 	}
 
 	result := make([]*resp.PermissionResp, 0, len(policies))
@@ -276,23 +277,23 @@ func (s *permissionService) GetRolePermissions(ctx context.Context, roleID uint6
 func (s *permissionService) AssignRole(ctx context.Context, userID, roleID uint64) error {
 	// 检查角色是否存在
 	if _, err := s.roleRepo.FindByID(ctx, roleID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("角色不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(response.CodeNotFound, "角色不存在")
 		}
-		return fmt.Errorf("查询角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "查询角色失败")
 	}
 
 	// 检查是否已分配
 	exist, err := s.userRoleRepo.Exists(ctx, userID, roleID)
 	if err != nil {
-		return fmt.Errorf("检查用户角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "检查用户角色失败")
 	}
 	if exist {
-		return errors.New("用户已拥有该角色")
+		return apperrors.New(response.CodeInvalidParam, "用户已拥有该角色")
 	}
 
 	if err := s.userRoleRepo.Assign(ctx, userID, roleID); err != nil {
-		return fmt.Errorf("分配角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "分配角色失败")
 	}
 
 	return nil
@@ -301,10 +302,10 @@ func (s *permissionService) AssignRole(ctx context.Context, userID, roleID uint6
 // RemoveRole 移除用户角色
 func (s *permissionService) RemoveRole(ctx context.Context, userID, roleID uint64) error {
 	if err := s.userRoleRepo.Delete(ctx, userID, roleID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("用户角色关联不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(response.CodeNotFound, "用户角色关联不存在")
 		}
-		return fmt.Errorf("移除角色失败: %w", err)
+		return apperrors.Wrap(err, response.CodeDBError, "移除角色失败")
 	}
 	return nil
 }
@@ -313,7 +314,7 @@ func (s *permissionService) RemoveRole(ctx context.Context, userID, roleID uint6
 func (s *permissionService) GetUserRoles(ctx context.Context, userID uint64) ([]*resp.RoleResp, error) {
 	roles, err := s.userRoleRepo.FindByUserID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("查询用户角色失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "查询用户角色失败")
 	}
 
 	result := make([]*resp.RoleResp, len(roles))

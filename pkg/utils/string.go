@@ -138,12 +138,18 @@ func RandomDigits(length int) (string, error) {
 // CamelCaseToSnakeCase 驼峰转下划线
 // 例: UserName -> user_name, userID -> user_id
 func CamelCaseToSnakeCase(s string) string {
+	runes := []rune(s)
 	var result []rune
-	for i, r := range s {
+	for i, r := range runes {
 		if i > 0 && r >= 'A' && r <= 'Z' {
-			// 检查前一个字符是否是小写或数字，如果是则加下划线
-			prev := s[i-1]
-			if (prev >= 'a' && prev <= 'z') || (prev >= '0' && prev <= '9') {
+			prev := runes[i-1]
+			var next rune
+			if i+1 < len(runes) {
+				next = runes[i+1]
+			}
+			if (prev >= 'a' && prev <= 'z') ||
+				(prev >= '0' && prev <= '9') ||
+				(prev >= 'A' && prev <= 'Z' && next >= 'a' && next <= 'z') {
 				result = append(result, '_')
 			}
 		}
@@ -256,7 +262,7 @@ func FirstToLower(s string) string {
 // IsAlpha 判断是否全是字母
 func IsAlpha(s string) bool {
 	for _, r := range s {
-		if !unicode.IsLetter(r) {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
 			return false
 		}
 	}
@@ -276,7 +282,7 @@ func IsNumeric(s string) bool {
 // IsAlphanumeric 判断是否全是字母或数字
 func IsAlphanumeric(s string) bool {
 	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || unicode.IsDigit(r)) {
 			return false
 		}
 	}

@@ -275,10 +275,13 @@ func maskToken(token string) string {
 
 // GetUserID 从 gin.Context 获取用户 ID
 // 调用前需要确保使用了 Auth 中间件
-func GetUserID(c *gin.Context) uint {
+func GetUserID(c *gin.Context) uint64 {
 	if userID, exists := c.Get(UserIDKey); exists {
-		if id, ok := userID.(uint); ok {
+		if id, ok := userID.(uint64); ok {
 			return id
+		}
+		if id, ok := userID.(uint); ok {
+			return uint64(id)
 		}
 	}
 	return 0

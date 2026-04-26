@@ -1,6 +1,7 @@
 package errors
 
 import (
+	stderrors "errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -34,6 +35,15 @@ func New(code int, message string) *BusinessError {
 		Code:    code,
 		Message: message,
 	}
+}
+
+// AsBusinessError extracts a BusinessError from an error chain.
+func AsBusinessError(err error) (*BusinessError, bool) {
+	var businessErr *BusinessError
+	if stderrors.As(err, &businessErr) {
+		return businessErr, true
+	}
+	return nil, false
 }
 
 // Wrap 包装错误

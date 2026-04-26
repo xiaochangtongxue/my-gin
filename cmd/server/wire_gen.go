@@ -9,22 +9,24 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"github.com/xiaochangtongxue/my-gin/internal/handler"
+	"github.com/xiaochangtongxue/my-gin/internal/app"
 	"github.com/xiaochangtongxue/my-gin/internal/middleware"
-	"github.com/xiaochangtongxue/my-gin/internal/repository"
-	"github.com/xiaochangtongxue/my-gin/internal/service"
+	"github.com/xiaochangtongxue/my-gin/internal/modules/auth"
+	"github.com/xiaochangtongxue/my-gin/internal/modules/docs"
+	"github.com/xiaochangtongxue/my-gin/internal/modules/health"
+	"github.com/xiaochangtongxue/my-gin/internal/modules/metrics"
+	"github.com/xiaochangtongxue/my-gin/internal/modules/permission"
+	"github.com/xiaochangtongxue/my-gin/internal/modules/security"
 	"github.com/xiaochangtongxue/my-gin/pkg/cache"
-	"github.com/xiaochangtongxue/my-gin/pkg/captcha"
 	"github.com/xiaochangtongxue/my-gin/pkg/config"
 	"github.com/xiaochangtongxue/my-gin/pkg/database"
 	"github.com/xiaochangtongxue/my-gin/pkg/jwt"
-	"github.com/xiaochangtongxue/my-gin/pkg/notify"
-	"github.com/xiaochangtongxue/my-gin/pkg/permission"
+	metrics2 "github.com/xiaochangtongxue/my-gin/pkg/metrics"
 	"gorm.io/gorm"
 )
 
 import (
-	_ "github.com/xiaochangtongxue/my-gin/docs"
+	_ "github.com/xiaochangtongxue/my-gin/api"
 )
 
 // Injectors from wire.go:
@@ -32,7 +34,7 @@ import (
 // InitializeApp 初始化应用程序（Wire 生成）
 //
 //go:generate wire
-func InitializeApp(configFile2 string) (*App, error) {
+func InitializeApp(configFile2 string) (*app.App, error) {
 	config, err := ProvideConfig(configFile2)
 	if err != nil {
 		return nil, err
@@ -47,39 +49,33 @@ func InitializeApp(configFile2 string) (*App, error) {
 	}
 	manager := ProvideJWTManager(config)
 	engine := ProvideGinEngine(config, manager, cache)
-	refreshTokenRepository := ProvideRefreshTokenRepository(db)
-	userRepository := ProvideUserRepository(db)
-	securityService := ProvideSecurityService(cache, config)
-	captcha := ProvideCaptcha(config, cache)
-	notifier := ProvideNotifier()
-	authService := ProvideAuthService(refreshTokenRepository, cache, manager, config, userRepository, securityService, captcha, notifier)
-	authHandler := ProvideAuthHandler(authService)
-	captchaHandler := ProvideCaptchaHandler(captcha)
-	securityHandler := ProvideSecurityHandler(securityService)
-	healthHandler := ProvideHealthHandler(db, cache)
-	roleRepository := ProvideRoleRepository(db)
-	userRoleRepository := ProvideUserRoleRepository(db)
-	permissionChecker, err := ProvidePermissionChecker(config, db)
+	module := docs.NewModule()
+	healthHandler := health.ProvideHealthHandler(db, cache)
+	healthModule := health.NewModule(healthHandler)
+	metricsModule := metrics.NewModule()
+	refreshTokenRepository := auth.ProvideRefreshTokenRepository(db)
+	userRepository := auth.ProvideUserRepository(db)
+	securityService := security.ProvideSecurityService(cache, config)
+	captcha := auth.ProvideCaptcha(config, cache)
+	notifier := auth.ProvideNotifier()
+	authService := auth.ProvideAuthService(refreshTokenRepository, cache, manager, config, userRepository, securityService, captcha, notifier)
+	authHandler := auth.ProvideAuthHandler(authService)
+	captchaHandler := auth.ProvideCaptchaHandler(captcha)
+	authModule := auth.NewModule(authHandler, captchaHandler)
+	securityHandler := security.ProvideSecurityHandler(securityService)
+	permissionChecker, err := permission.ProvidePermissionChecker(config, db)
 	if err != nil {
 		return nil, err
 	}
-	permissionService := ProvidePermissionService(db, roleRepository, userRoleRepository, permissionChecker)
-	permissionHandler := ProvidePermissionHandler(permissionService)
-	app := &App{
-		Config:            config,
-		DB:                db,
-		Cache:             cache,
-		JWTMgr:            manager,
-		Engine:            engine,
-		AuthHandler:       authHandler,
-		CaptchaHandler:    captchaHandler,
-		SecurityHandler:   securityHandler,
-		HealthHandler:     healthHandler,
-		PermissionHandler: permissionHandler,
-		PermissionChecker: permissionChecker,
-		UserRoleRepo:      userRoleRepository,
-	}
-	return app, nil
+	userRoleRepository := permission.ProvideUserRoleRepository(db)
+	securityModule := security.NewModule(securityHandler, permissionChecker, userRoleRepository)
+	roleRepository := permission.ProvideRoleRepository(db)
+	permissionService := permission.ProvidePermissionService(db, roleRepository, userRoleRepository, permissionChecker)
+	permissionHandler := permission.ProvidePermissionHandler(permissionService)
+	permissionModule := permission.NewModule(permissionHandler, permissionChecker, userRoleRepository)
+	v := ProvideRouteModules(module, healthModule, metricsModule, authModule, securityModule, permissionModule)
+	appApp := app.New(config, db, cache, manager, engine, v)
+	return appApp, nil
 }
 
 // wire.go:
@@ -120,113 +116,12 @@ func ProvideJWTManager(cfg *config.Config) *jwt.Manager {
 	return mgr
 }
 
-// ProvideRefreshTokenRepository 提供 Refresh Token 仓储
-func ProvideRefreshTokenRepository(db *gorm.DB) repository.RefreshTokenRepository {
-	return repository.NewRefreshTokenRepository(db)
-}
-
-// ProvideUserRepository 提供用户仓储
-func ProvideUserRepository(db *gorm.DB) repository.UserRepository {
-	return repository.NewUserRepository(db)
-}
-
-// ProvideRoleRepository 提供角色仓储
-func ProvideRoleRepository(db *gorm.DB) repository.RoleRepository {
-	return repository.NewRoleRepository(db)
-}
-
-// ProvideUserRoleRepository 提供用户角色仓储
-func ProvideUserRoleRepository(db *gorm.DB) repository.UserRoleRepository {
-	return repository.NewUserRoleRepository(db)
-}
-
-// ProvideNotifier 提供通知器（使用 NoopNotifier）
-func ProvideNotifier() notify.Notifier {
-	return notify.NewNoopNotifier()
-}
-
-// ProvideCaptcha 提供验证码
-func ProvideCaptcha(cfg *config.Config, cache2 cache.Cache) *captcha.Captcha {
-	return captcha.New(captcha.Config{
-		Length: cfg.Captcha.Length,
-		Width:  cfg.Captcha.Width,
-		Height: cfg.Captcha.Height,
-		Expire: cfg.Captcha.Expire,
-	}, cache2)
-}
-
-// ProvidePermissionChecker 提供权限检查器
-func ProvidePermissionChecker(cfg *config.Config, db *gorm.DB) (permission.PermissionChecker, error) {
-	return permission.NewChecker(cfg, db)
-}
-
-// ProvideAuthService 提供认证服务
-func ProvideAuthService(
-	rtRepo repository.RefreshTokenRepository,
-	redisCache cache.Cache,
-	jwtMgr *jwt.Manager,
-	cfg *config.Config,
-	userRepo repository.UserRepository,
-	securitySvc service.SecurityService, captcha2 *captcha.Captcha, notify2 notify.Notifier,
-
-) service.AuthService {
-	return service.NewAuthService(rtRepo, redisCache, jwtMgr, service.Config{
-		AccessTokenExpire:  cfg.JWT.ExpireTime,
-		RefreshTokenExpire: cfg.JWT.RefreshExpireTime,
-	}, userRepo, securitySvc, captcha2, notify2, cfg.Password.BcryptCost)
-}
-
-// ProvideSecurityService 提供安全服务
-func ProvideSecurityService(cache2 cache.Cache, cfg *config.Config) service.SecurityService {
-	return service.NewSecurityService(cache2, service.SecurityConfig{
-		MaxAttempts:       5,
-		LockDuration:      30 * 60,
-		Window:            15 * 60,
-		BlacklistDuration: 60 * 60,
-	})
-}
-
-// ProvidePermissionService 提供权限服务
-func ProvidePermissionService(
-	db *gorm.DB,
-	roleRepo repository.RoleRepository,
-	userRoleRepo repository.UserRoleRepository,
-	checker permission.PermissionChecker,
-) service.PermissionService {
-
-	policyMgr := checker.(permission.PolicyManager)
-	return service.NewPermissionService(db, roleRepo, userRoleRepo, policyMgr)
-}
-
-// ProvideAuthHandler 提供认证处理器
-func ProvideAuthHandler(authSvc service.AuthService) *handler.AuthHandler {
-	return handler.NewAuthHandler(authSvc)
-}
-
-// ProvideCaptchaHandler 提供验证码处理器
-func ProvideCaptchaHandler(captcha2 *captcha.Captcha) *handler.CaptchaHandler {
-	return handler.NewCaptchaHandler(captcha2)
-}
-
-// ProvideSecurityHandler 提供安全处理器
-func ProvideSecurityHandler(securitySvc service.SecurityService) *handler.SecurityHandler {
-	return handler.NewSecurityHandler(securitySvc)
-}
-
-// ProvideHealthHandler 提供健康检查处理器
-func ProvideHealthHandler(db *gorm.DB, cache2 cache.Cache) *handler.HealthHandler {
-	return handler.NewHealthHandler(db, cache2)
-}
-
-// ProvidePermissionHandler 提供权限处理器
-func ProvidePermissionHandler(permissionSvc service.PermissionService) *handler.PermissionHandler {
-	return handler.NewPermissionHandler(permissionSvc)
-}
-
 // ProvideGinEngine 提供 Gin 引擎
 func ProvideGinEngine(cfg *config.Config, jwtMgr *jwt.Manager, redisCache cache.Cache) *gin.Engine {
 	gin.SetMode(cfg.Server.Mode)
 	engine := gin.New()
+	metrics2.AppStartTime.
+		SetToCurrentTime()
 	middleware.ApplyWithConfig(engine, cfg, middleware.DefaultMiddleware{
 		EnableRecovery:  true,
 		EnableRequestID: true,
@@ -247,58 +142,18 @@ func ProvideGinEngine(cfg *config.Config, jwtMgr *jwt.Manager, redisCache cache.
 	return engine
 }
 
-// infraSet 基础设施 ProviderSet
+// ProvideRouteModules keeps route registration order explicit.
+func ProvideRouteModules(docs2 *docs.Module, health2 *health.Module, metrics3 *metrics.Module, auth2 *auth.Module, security2 *security.Module, permission2 *permission.Module,
+) []app.RouteModule {
+	return []app.RouteModule{docs2, health2, metrics3, auth2, security2, permission2}
+}
+
 var infraSet = wire.NewSet(
 	ProvideConfig,
 	ProvideDB,
 	ProvideRedisCache,
 	ProvideJWTManager,
-	ProvideNotifier,
-	ProvideCaptcha,
-	ProvidePermissionChecker,
-)
-
-// repoSet Repository ProviderSet
-var repoSet = wire.NewSet(
-	ProvideRefreshTokenRepository,
-	ProvideUserRepository,
-	ProvideRoleRepository,
-	ProvideUserRoleRepository,
-)
-
-// serviceSet Service ProviderSet
-var serviceSet = wire.NewSet(
-	ProvideAuthService,
-	ProvideSecurityService,
-	ProvidePermissionService,
-)
-
-// handlerSet Handler ProviderSet
-var handlerSet = wire.NewSet(
-	ProvideAuthHandler,
-	ProvideCaptchaHandler,
-	ProvideSecurityHandler,
-	ProvideHealthHandler,
-	ProvidePermissionHandler,
-)
-
-// engineSet Gin Engine ProviderSet
-var engineSet = wire.NewSet(
 	ProvideGinEngine,
 )
 
-// App 应用程序依赖容器
-type App struct {
-	Config            *config.Config
-	DB                *gorm.DB
-	Cache             cache.Cache
-	JWTMgr            *jwt.Manager
-	Engine            *gin.Engine
-	AuthHandler       *handler.AuthHandler
-	CaptchaHandler    *handler.CaptchaHandler
-	SecurityHandler   *handler.SecurityHandler
-	HealthHandler     *handler.HealthHandler
-	PermissionHandler *handler.PermissionHandler
-	PermissionChecker permission.PermissionChecker
-	UserRoleRepo      repository.UserRoleRepository
-}
+var moduleSet = wire.NewSet(docs.ProviderSet, health.ProviderSet, metrics.ProviderSet, permission.ProviderSet, security.ProviderSet, auth.ProviderSet, ProvideRouteModules)

@@ -51,7 +51,7 @@ func (h *PermissionHandler) CreateRole(c *gin.Context) {
 			zap.String("code", r.Code),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *PermissionHandler) UpdateRole(c *gin.Context) {
 			zap.Uint64("id", id),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -133,7 +133,7 @@ func (h *PermissionHandler) DeleteRole(c *gin.Context) {
 			zap.Uint64("id", id),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *PermissionHandler) GetRole(c *gin.Context) {
 			zap.Uint64("id", id),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeNotFound, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -203,7 +203,7 @@ func (h *PermissionHandler) ListRoles(c *gin.Context) {
 			zap.String("request_id", middleware.GetRequestID(c)),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeServerError, "获取角色列表失败")
+		response.Error(c, err)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *PermissionHandler) AddPermission(c *gin.Context) {
 			zap.String("action", r.Action),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (h *PermissionHandler) RemovePermission(c *gin.Context) {
 			zap.String("action", action),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -335,7 +335,7 @@ func (h *PermissionHandler) GetRolePermissions(c *gin.Context) {
 			zap.Uint64("role_id", roleID),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeServerError, "获取权限列表失败")
+		response.Error(c, err)
 		return
 	}
 
@@ -375,7 +375,7 @@ func (h *PermissionHandler) AssignRole(c *gin.Context) {
 			zap.Uint64("role_id", r.RoleID),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -422,7 +422,7 @@ func (h *PermissionHandler) RemoveRole(c *gin.Context) {
 			zap.Uint64("role_id", roleID),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeInvalidParam, err.Error())
+		response.Error(c, err)
 		return
 	}
 
@@ -461,7 +461,7 @@ func (h *PermissionHandler) GetUserRoles(c *gin.Context) {
 			zap.Uint64("user_id", userID),
 			zap.Error(err),
 		)
-		response.Fail(c, response.CodeServerError, "获取用户角色失败")
+		response.Error(c, err)
 		return
 	}
 

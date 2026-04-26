@@ -53,6 +53,7 @@ func Init(configPath string) (*Config, error) {
 	v.SetEnvPrefix("APP")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	bindEnv(v)
 
 	// 解析配置
 	cfg := &Config{}
@@ -105,9 +106,36 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("jwt.secret 不能为空")
 	}
 
-	if len(cfg.JWT.Secret) < 16 {
-		return fmt.Errorf("jwt.secret 长度不能少于16位")
+	if len(cfg.JWT.Secret) < 32 {
+		return fmt.Errorf("jwt.secret 长度不能少于32位")
 	}
 
 	return nil
+}
+
+func bindEnv(v *viper.Viper) {
+	bindings := map[string][]string{
+		"server.mode":             {"APP_SERVER_MODE", "APP_MODE"},
+		"server.host":             {"APP_SERVER_HOST"},
+		"server.port":             {"APP_SERVER_PORT"},
+		"database.driver":         {"APP_DATABASE_DRIVER"},
+		"database.host":           {"APP_DATABASE_HOST"},
+		"database.port":           {"APP_DATABASE_PORT"},
+		"database.username":       {"APP_DATABASE_USERNAME"},
+		"database.password":       {"APP_DATABASE_PASSWORD"},
+		"database.database":       {"APP_DATABASE_NAME", "APP_DATABASE_DATABASE"},
+		"redis.host":              {"APP_REDIS_HOST"},
+		"redis.port":              {"APP_REDIS_PORT"},
+		"redis.password":          {"APP_REDIS_PASSWORD"},
+		"redis.db":                {"APP_REDIS_DB"},
+		"jwt.secret":              {"APP_JWT_SECRET"},
+		"jwt.expire_time":         {"APP_JWT_EXPIRE_TIME"},
+		"jwt.refresh_expire_time": {"APP_JWT_REFRESH_EXPIRE_TIME"},
+		"jwt.issuer":              {"APP_JWT_ISSUER"},
+	}
+
+	for key, envVars := range bindings {
+		args := append([]string{key}, envVars...)
+		_ = v.BindEnv(args...)
+	}
 }

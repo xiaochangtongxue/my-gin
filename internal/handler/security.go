@@ -42,7 +42,7 @@ func (h *SecurityHandler) UnlockAccount(c *gin.Context) {
 			zap.String("uid", uid),
 			zap.Error(err),
 		)
-		response.ServerError(c, "解锁账号失败")
+		response.Error(c, err)
 		return
 	}
 

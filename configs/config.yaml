@@ -9,10 +9,10 @@ server:
 # 数据库配置
 database:
   driver: mysql
-  host: "127.0.0.1"         # 从环境变量 APP_DATABASE_HOST 覆盖
+  host: "192.168.111.128"         # 从环境变量 APP_DATABASE_HOST 覆盖
   port: 3306
   username: "root"          # 从环境变量 APP_DATABASE_USERNAME 覆盖
-  password: ""               # 从环境变量 APP_DATABASE_PASSWORD 读取（必填）
+  password: "123456"               # 从环境变量 APP_DATABASE_PASSWORD 读取（必填）
   database: "my_app_db"      # 从环境变量 APP_DATABASE_NAME 覆盖
   charset: "utf8mb4"
   parse_time: true
@@ -24,9 +24,9 @@ database:
 
 # Redis配置
 redis:
-  host: "127.0.0.1:6379"   # 从环境变量 APP_REDIS_HOST 覆盖
+  host: "192.168.111.128"        # 从环境变量 APP_REDIS_HOST 覆盖
   port: 6379
-  password: ""              # 从环境变量 APP_REDIS_PASSWORD 读取（可选）
+  password: "123456"              # 从环境变量 APP_REDIS_PASSWORD 读取（可选）
   db: 0
   pool_size: 100
   min_idle_conn: 10
@@ -147,13 +147,12 @@ middleware:
       - "/health/live"       # 存活检查
       - "/health/ready"      # 就绪检查
       - "/api/v1/ping"       # Ping接口
-      - "/api/v1/captcha"    # 验证码接口
-      - "/api/v1/register"   # 注册接口
-      - "/api/v1/login"      # 登录接口
-      - "/api/v1/refresh"    # 刷新Token接口
+      - "/api/v1/auth/captcha"    # 验证码接口
+      - "/api/v1/auth/register"   # 注册接口
+      - "/api/v1/auth/login"      # 登录接口
+      - "/api/v1/auth/refresh"    # 刷新Token接口
       - "/swagger"           # Swagger 文档（前缀匹配）
       - "/metrics"           # Prometheus 指标
-      - "/api/v1/admin/unlock-account"  # 解锁账号接口（临时开放，后续需RBAC权限控制）
 
   # Metrics 指标收集中间件配置
   metrics:
@@ -181,4 +180,4 @@ middleware:
 # 权限控制配置
 permission:
   model: rbac               # 权限模型：rbac, abac, acl
-  model_file: "pkg/permission/model.conf" # Casbin 模型文件路径
+  model_file: ""            # 为空时使用 internal/permission 内嵌模型

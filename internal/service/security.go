@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/xiaochangtongxue/my-gin/pkg/cache"
+	apperrors "github.com/xiaochangtongxue/my-gin/pkg/errors"
+	"github.com/xiaochangtongxue/my-gin/pkg/response"
 )
 
 // SecurityService 安全服务接口
@@ -57,22 +57,12 @@ func NewSecurityService(cache cache.Cache, cfg SecurityConfig) SecurityService {
 
 // IsAccountLocked 检查账号是否被锁定
 func (s *securityService) IsAccountLocked(ctx context.Context, uid string) (bool, error) {
-	key := s.lockedKey(uid)
-	_, err := s.cache.Get(ctx, key)
-	if err != nil {
-		return false, nil
-	}
-	return true, nil
+	return s.cache.Exists(ctx, s.lockedKey(uid))
 }
 
 // NeedCaptcha 检查是否需要验证码
 func (s *securityService) NeedCaptcha(ctx context.Context, ip, uid string) (bool, error) {
-	key := s.needCaptchaKey(ip, uid)
-	_, err := s.cache.Get(ctx, key)
-	if err != nil {
-		return false, nil
-	}
-	return true, nil
+	return s.cache.Exists(ctx, s.needCaptchaKey(ip, uid))
 }
 
 // RecordFailure 记录登录失败
@@ -80,47 +70,44 @@ func (s *securityService) RecordFailure(ctx context.Context, ip, uid string) err
 	// 1. 设置需要验证码标记
 	needCaptchaKey := s.needCaptchaKey(ip, uid)
 	if err := s.cache.Set(ctx, needCaptchaKey, "1", s.cfg.Window); err != nil {
-		return fmt.Errorf("设置验证码标记失败: %w", err)
+		return apperrors.Wrap(err, response.CodeRedisError, "设置验证码标记失败")
 	}
 
 	// 2. 增加失败次数
 	failKey := s.failKey(ip, uid)
-	failCountStr, err := s.cache.Get(ctx, failKey)
-	failCount := 0
-	if err == nil && failCountStr != "" {
-		failCount, _ = strconv.Atoi(failCountStr)
+	failCount, err := s.cache.Incr(ctx, failKey)
+	if err != nil {
+		return apperrors.Wrap(err, response.CodeRedisError, "记录失败次数失败")
 	}
-	failCount++
-
-	if err := s.cache.Set(ctx, failKey, strconv.Itoa(failCount), s.cfg.Window); err != nil {
-		return fmt.Errorf("记录失败次数失败: %w", err)
+	if failCount == 1 {
+		if err := s.cache.Expire(ctx, failKey, s.cfg.Window); err != nil {
+			return apperrors.Wrap(err, response.CodeRedisError, "设置失败次数过期时间失败")
+		}
 	}
 
 	// 3. 检查是否需要锁定
-	if failCount >= s.cfg.MaxAttempts {
+	if failCount >= int64(s.cfg.MaxAttempts) {
 		// 锁定账号
 		if err := s.cache.Set(ctx, s.lockedKey(uid), "1", s.cfg.LockDuration); err != nil {
-			return fmt.Errorf("锁定账号失败: %w", err)
+			return apperrors.Wrap(err, response.CodeRedisError, "锁定账号失败")
 		}
 
 		// 检查是否需要加入IP黑名单
-		blacklistKey := s.blacklistKey(ip)
-		blacklistCountStr, _ := s.cache.Get(ctx, blacklistKey)
-		blacklistCount := 0
-		if blacklistCountStr != "" {
-			blacklistCount, _ = strconv.Atoi(blacklistCountStr)
+		blacklistCountKey := s.blacklistCountKey(ip)
+		blacklistCount, err := s.cache.Incr(ctx, blacklistCountKey)
+		if err != nil {
+			return apperrors.Wrap(err, response.CodeRedisError, "更新黑名单计数失败")
 		}
-		blacklistCount++
+		if blacklistCount == 1 {
+			if err := s.cache.Expire(ctx, blacklistCountKey, 24*time.Hour); err != nil {
+				return apperrors.Wrap(err, response.CodeRedisError, "设置黑名单计数过期时间失败")
+			}
+		}
 
 		// 累计失败10次加入黑名单
 		if blacklistCount >= 10 {
-			if err := s.cache.Set(ctx, blacklistKey, "1", s.cfg.BlacklistDuration); err != nil {
-				return fmt.Errorf("加入黑名单失败: %w", err)
-			}
-		} else {
-			// 更新黑名单计数
-			if err := s.cache.Set(ctx, blacklistKey, strconv.Itoa(blacklistCount), time.Hour*24); err != nil {
-				return fmt.Errorf("更新黑名单计数失败: %w", err)
+			if err := s.cache.Set(ctx, s.blacklistKey(ip), "1", s.cfg.BlacklistDuration); err != nil {
+				return apperrors.Wrap(err, response.CodeRedisError, "加入黑名单失败")
 			}
 		}
 	}
@@ -155,19 +142,14 @@ func (s *securityService) GetLockTimeRemaining(ctx context.Context, uid string) 
 func (s *securityService) UnlockAccount(ctx context.Context, uid string) error {
 	// 删除锁定标记
 	if err := s.cache.Del(ctx, s.lockedKey(uid)); err != nil {
-		return fmt.Errorf("解锁账号失败: %w", err)
+		return apperrors.Wrap(err, response.CodeRedisError, "解锁账号失败")
 	}
 	return nil
 }
 
 // IsIPBlacklisted 检查IP是否在黑名单中
 func (s *securityService) IsIPBlacklisted(ctx context.Context, ip string) (bool, error) {
-	key := s.blacklistKey(ip)
-	_, err := s.cache.Get(ctx, key)
-	if err != nil {
-		return false, nil
-	}
-	return true, nil
+	return s.cache.Exists(ctx, s.blacklistKey(ip))
 }
 
 // Redis key 生成方法
@@ -185,4 +167,8 @@ func (s *securityService) lockedKey(uid string) string {
 
 func (s *securityService) blacklistKey(ip string) string {
 	return "login:blacklist:" + ip
+}
+
+func (s *securityService) blacklistCountKey(ip string) string {
+	return "login:blacklist_count:" + ip
 }

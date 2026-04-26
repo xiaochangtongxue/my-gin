@@ -693,7 +693,7 @@ paths:
       summary: 移除用户角色
       tags:
       - 权限管理
-  /api/v1/captcha:
+  /api/v1/auth/captcha:
     get:
       description: 生成图形验证码
       produces:
@@ -711,7 +711,7 @@ paths:
       summary: 获取验证码
       tags:
       - 验证码
-  /api/v1/login:
+  /api/v1/auth/login:
     post:
       consumes:
       - application/json
@@ -742,7 +742,7 @@ paths:
       summary: 用户登录
       tags:
       - 认证
-  /api/v1/logout:
+  /api/v1/auth/logout:
     post:
       consumes:
       - application/json
@@ -766,7 +766,7 @@ paths:
       summary: 用户登出
       tags:
       - 认证
-  /api/v1/refresh:
+  /api/v1/auth/refresh:
     post:
       consumes:
       - application/json
@@ -801,7 +801,7 @@ paths:
       summary: 刷新 Access Token
       tags:
       - 认证
-  /api/v1/register:
+  /api/v1/auth/register:
     post:
       consumes:
       - application/json

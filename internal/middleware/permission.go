@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xiaochangtongxue/my-gin/internal/repository"
+	"github.com/xiaochangtongxue/my-gin/internal/permission"
 	"github.com/xiaochangtongxue/my-gin/pkg/logger"
-	"github.com/xiaochangtongxue/my-gin/pkg/permission"
 	"github.com/xiaochangtongxue/my-gin/pkg/response"
 	"go.uber.org/zap"
 )

@@ -22,7 +22,7 @@ func NewChecker(cfg *config.Config, db *gorm.DB) (PermissionChecker, error) {
 	// 	return NewACLChecker(db, cfg.Permission.ModelFile)
 	default:
 		// 默认使用 RBAC
-		return NewRBACChecker(db, "pkg/permission/model.conf")
+		return NewRBACChecker(db, "")
 	}
 }
 

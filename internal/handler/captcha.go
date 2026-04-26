@@ -28,7 +28,7 @@ func NewCaptchaHandler(captcha *captcha.Captcha) *CaptchaHandler {
 // @Tags 验证码
 // @Produce json
 // @Success 200 {object} response.Response{data=resp.CaptchaResp}
-// @Router /api/v1/captcha [get]
+// @Router /api/v1/auth/captcha [get]
 func (h *CaptchaHandler) GetCaptcha(c *gin.Context) {
 	captchaID, imageBase64, err := h.captcha.Generate(c.Request.Context())
 	if err != nil {

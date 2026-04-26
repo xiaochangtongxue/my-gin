@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-此文件为 Claude Code 在本仓库中工作提供指导。内容与 `AGENTS.md` 保持一致，便于不同代码助手共享项目约束。
+此文件为 Codex 在本仓库中工作提供指导。
 
 ## 项目概览
 
@@ -28,10 +28,19 @@ github.com/xiaochangtongxue/my-gin
 ## 常用命令
 
 ```bash
+# 运行
 go run cmd/server/main.go -c configs/config.yaml
+
+# 构建
 go build -o bin/server.exe ./cmd/server
+
+# 测试
 go test ./...
+
+# Wire 生成
 go run github.com/google/wire/cmd/wire ./cmd/server
+
+# Swagger/OpenAPI 生成
 go run github.com/swaggo/swag/cmd/swag init -g cmd/server/main.go -o api
 ```
 
@@ -58,7 +67,7 @@ curl http://localhost:8080/swagger/index.html
 - `APP_REDIS_HOST`
 - `APP_REDIS_PORT`
 
-数据库、Redis、RBAC 初始化采用严格启动策略：失败即返回错误并终止启动。
+数据库、Redis、RBAC 初始化采用严格启动策略：失败即返回错误并终止启动。不要引入本地内存缓存降级启动，除非用户明确要求改变策略。
 
 ## API 路径
 
@@ -74,7 +83,23 @@ curl http://localhost:8080/swagger/index.html
 
 ## 错误处理规范
 
-Service 层返回 `pkg/errors.BusinessError`，Handler 层统一使用 `response.Error(c, err)`。不要在 Handler 中通过 `err.Error()` 字符串比较判断业务错误。
+Service 层返回 `pkg/errors.BusinessError`：
+
+```go
+return nil, errors.New(response.CodeInvalidParam, "参数错误")
+return nil, errors.Wrap(err, response.CodeDBError, "查询失败")
+```
+
+Handler 层统一：
+
+```go
+if err != nil {
+    response.Error(c, err)
+    return
+}
+```
+
+不要在 Handler 中通过 `err.Error()` 字符串比较判断业务错误。
 
 新增错误码时必须同步：
 
@@ -83,13 +108,19 @@ Service 层返回 `pkg/errors.BusinessError`，Handler 层统一使用 `response
 3. `pkg/response/response.go` 的 HTTP 状态码映射
 4. `docs/api-contract.md` 错误码表
 
-## Wire 与 Swagger
+## Wire 规范
 
 - `cmd/server/wire.go` 保留 `infraSet`、`moduleSet` 和 `ProvideRouteModules`
 - 模块自己的依赖放到 `internal/modules/<name>/module.go`
-- 修改 ProviderSet 后运行 Wire 生成命令
+- 修改 ProviderSet 后运行 `go run github.com/google/wire/cmd/wire ./cmd/server`
+- `cmd/server/wire_gen.go` 是生成文件，不手改
+
+## 文档与 Swagger
+
 - Swagger 生成目录统一为 `api/`
 - 不再使用 `cmd/server/docs/` 或 `docs/swagger.*`
+- 修改路由注解后运行 Swagger 生成命令
+- 前端对接说明维护在 `docs/api-contract.md`
 
 ## 代码规范
 

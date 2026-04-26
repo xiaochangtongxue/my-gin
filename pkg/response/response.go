@@ -1,10 +1,12 @@
 package response
 
 import (
+	stderrors "errors"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	apperrors "github.com/xiaochangtongxue/my-gin/pkg/errors"
 )
 
 // Response 标准响应结构
@@ -64,6 +66,22 @@ func FailWithData(c *gin.Context, code int, message string, data interface{}) {
 		Timestamp: time.Now().Unix(),
 		RequestID: getRequestID(c),
 	})
+}
+
+// Error writes a standardized error response.
+func Error(c *gin.Context, err error) {
+	if err == nil {
+		Success(c, nil)
+		return
+	}
+
+	var businessErr *apperrors.BusinessError
+	if stderrors.As(err, &businessErr) {
+		Fail(c, businessErr.Code, businessErr.Message)
+		return
+	}
+
+	Fail(c, CodeServerError, "")
 }
 
 // PageSuccess 分页成功响应

@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"errors"
+	stderrors "errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -12,8 +12,10 @@ import (
 	"github.com/xiaochangtongxue/my-gin/pkg/cache"
 	"github.com/xiaochangtongxue/my-gin/pkg/captcha"
 	"github.com/xiaochangtongxue/my-gin/pkg/crypto"
+	apperrors "github.com/xiaochangtongxue/my-gin/pkg/errors"
 	"github.com/xiaochangtongxue/my-gin/pkg/jwt"
 	"github.com/xiaochangtongxue/my-gin/pkg/notify"
+	"github.com/xiaochangtongxue/my-gin/pkg/response"
 	"github.com/xiaochangtongxue/my-gin/pkg/utils"
 	"gorm.io/gorm"
 )
@@ -25,9 +27,9 @@ const (
 
 var (
 	// ErrRefreshTokenInvalid Refresh Token 无效
-	ErrRefreshTokenInvalid = errors.New("refresh token 无效")
+	ErrRefreshTokenInvalid = apperrors.New(response.CodeTokenInvalid, "Refresh Token 无效或已过期")
 	// ErrRefreshTokenExpired Refresh Token 已过期
-	ErrRefreshTokenExpired = errors.New("refresh token 已过期")
+	ErrRefreshTokenExpired = apperrors.New(response.CodeTokenExpired, "Refresh Token 已过期")
 )
 
 type AuthService interface {
@@ -118,25 +120,25 @@ func (s *authService) Register(ctx context.Context, mobile, username, password s
 	// 1. 检查手机号是否已注册
 	exist, err := s.userRepo.ExistsByMobile(ctx, mobile)
 	if err != nil {
-		return nil, fmt.Errorf("检查手机号失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "检查手机号失败")
 	}
 	if exist {
-		return nil, errors.New("该手机号已注册")
+		return nil, apperrors.New(response.CodeInvalidParam, "该手机号已注册")
 	}
 
 	// 2. 检查用户名是否已存在
 	exist, err = s.userRepo.ExistsByUsername(ctx, username)
 	if err != nil {
-		return nil, fmt.Errorf("检查用户名失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "检查用户名失败")
 	}
 	if exist {
-		return nil, errors.New("用户名已存在")
+		return nil, apperrors.New(response.CodeInvalidParam, "用户名已存在")
 	}
 
 	// 3. 密码加密
 	hash, err := crypto.HashPassword(password, s.bcryptCost)
 	if err != nil {
-		return nil, fmt.Errorf("密码加密失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeServerError, "密码加密失败")
 	}
 
 	// 4. 创建用户
@@ -146,13 +148,13 @@ func (s *authService) Register(ctx context.Context, mobile, username, password s
 		Password: string(hash),
 	}
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		return nil, fmt.Errorf("创建用户失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "创建用户失败")
 	}
 
 	// 5. 生成UID（Feistel混淆自增ID）
 	user.UID = utils.EncodeUID(user.ID)
 	if err := s.userRepo.UpdateUID(ctx, user.ID, user.UID); err != nil {
-		return nil, fmt.Errorf("更新用户UID失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "更新用户UID失败")
 	}
 
 	// 6. 发送注册成功通知（异步，不阻塞）
@@ -171,10 +173,10 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 	// 1. 根据手机号查用户
 	user, err := s.userRepo.FindByMobile(ctx, mobile)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("用户不存在")
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(response.CodePasswordError, "用户名或密码错误")
 		}
-		return nil, fmt.Errorf("查询用户失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeDBError, "查询用户失败")
 	}
 
 	uid := strconv.FormatUint(user.UID, 10)
@@ -182,33 +184,33 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 	// 2. 检查IP是否在黑名单中
 	blacklisted, err := s.securitySvc.IsIPBlacklisted(ctx, ip)
 	if err != nil {
-		return nil, fmt.Errorf("检查黑名单失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeRedisError, "检查黑名单失败")
 	}
 	if blacklisted {
-		return nil, errors.New("IP已被封禁，请联系管理员")
+		return nil, apperrors.New(response.CodeForbidden, "IP已被封禁，请联系管理员")
 	}
 
 	// 3. 检查账号是否被锁定
 	locked, err := s.securitySvc.IsAccountLocked(ctx, uid)
 	if err != nil {
-		return nil, fmt.Errorf("检查锁定状态失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeRedisError, "检查锁定状态失败")
 	}
 	if locked {
 		ttl, _ := s.securitySvc.GetLockTimeRemaining(ctx, uid)
-		return nil, fmt.Errorf("账号已锁定，请%d分钟后再试", ttl)
+		return nil, apperrors.New(response.CodeAccountLocked, fmt.Sprintf("账号已锁定，请%d分钟后再试", ttl))
 	}
 
 	// 4. 检查是否需要验证码
 	needCaptcha, err := s.securitySvc.NeedCaptcha(ctx, ip, uid)
 	if err != nil {
-		return nil, fmt.Errorf("检查验证码状态失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeRedisError, "检查验证码状态失败")
 	}
 	if needCaptcha {
 		if captchaID == "" || captchaCode == "" {
-			return nil, errors.New("请输入验证码")
+			return nil, apperrors.New(response.CodeCaptchaRequired, "请输入验证码")
 		}
 		if !s.captcha.Verify(ctx, captchaID, captchaCode) {
-			return nil, errors.New("验证码错误或已过期")
+			return nil, apperrors.New(response.CodeCaptchaError, "验证码错误或已过期")
 		}
 	}
 
@@ -216,7 +218,7 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 	if !crypto.VerifyPassword(user.Password, password) {
 		// 密码错误：记录失败
 		_ = s.securitySvc.RecordFailure(ctx, ip, uid)
-		return nil, errors.New("用户名或密码错误")
+		return nil, apperrors.New(response.CodePasswordError, "用户名或密码错误")
 	}
 
 	// 6. 密码正确：清除失败记录
@@ -225,13 +227,13 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 	// 7. 生成Token
 	accessToken, err := s.jwtMgr.GenerateToken(user.UID, user.Username)
 	if err != nil {
-		return nil, fmt.Errorf("生成Token失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeServerError, "生成Token失败")
 	}
 
 	// 8. 生成RefreshToken
 	refreshToken, err := crypto.RandomString(64)
 	if err != nil {
-		return nil, fmt.Errorf("生成刷新Token失败: %w", err)
+		return nil, apperrors.Wrap(err, response.CodeServerError, "生成刷新Token失败")
 	}
 
 	// 9. 把生成的RefreshToken存储到数据库
@@ -240,7 +242,9 @@ func (s *authService) Login(ctx context.Context, mobile, password, captchaID, ca
 		Token:     refreshToken,
 		ExpiresAt: time.Now().Add(s.refreshTTL),
 	}
-	s.rtRepo.Create(ctx, newRT)
+	if err := s.rtRepo.Create(ctx, newRT); err != nil {
+		return nil, apperrors.Wrap(err, response.CodeDBError, "保存刷新Token失败")
+	}
 
 	return &LoginResult{
 		UID:          user.UID,
@@ -270,13 +274,13 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*T
 	// 3. 生成新的 Access Token
 	accessToken, err := s.jwtMgr.GenerateToken(rt.UserID, "")
 	if err != nil {
-		return nil, err
+		return nil, apperrors.Wrap(err, response.CodeServerError, "生成Token失败")
 	}
 
 	// 4. 生成新的 Refresh Token（滚动更新）
 	newRefreshToken, err := crypto.RandomString(64)
 	if err != nil {
-		return nil, err
+		return nil, apperrors.Wrap(err, response.CodeServerError, "生成刷新Token失败")
 	}
 
 	newRT := &model.RefreshToken{
@@ -288,7 +292,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*T
 	// 5. 原子操作：删除旧的 RT，创建新的 RT
 	_, err = s.rtRepo.DeleteOldAndCreate(ctx, refreshToken, newRT)
 	if err != nil {
-		return nil, err
+		return nil, apperrors.Wrap(err, response.CodeDBError, "刷新Token失败")
 	}
 
 	return &TokenPair{
